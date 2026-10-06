@@ -224,8 +224,17 @@ class ScheduleRepository @Inject constructor(
 
     // ---- 笔记（录音） ----
 
+    /** 最近的**录音**笔记。「随手拍」不在里面，它走 [observeScratchNotes]。 */
     fun observeRecentNotes(limit: Int = 30): Flow<List<Note>> =
         noteDao.observeRecent(limit).map { list -> list.map { it.toDomain() } }
+
+    /** 最近的「随手拍」（一天一条，只有照片没有录音）。 */
+    fun observeScratchNotes(limit: Int = 30): Flow<List<Note>> =
+        noteDao.observeScratch(limit).map { list -> list.map { it.toDomain() } }
+
+    /** noteId → 照片张数。 */
+    fun observePhotoCounts(): Flow<Map<Long, Int>> =
+        noteDao.observePhotoCounts().map { list -> list.associate { it.noteId to it.count } }
 
     fun observeNotesByCourse(courseId: Long): Flow<List<Note>> =
         noteDao.observeByCourse(courseId).map { list -> list.map { it.toDomain() } }

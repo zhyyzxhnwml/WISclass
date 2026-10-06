@@ -69,6 +69,8 @@ data class NotesUiState(
     /** 现在正在上的课（决定新录音会自动归到哪门课） */
     val currentCourseName: String? = null,
     val recentNotes: List<Note> = emptyList(),
+    /** 「随手拍」：只有照片、没有录音，单独一块显示，不跟录音混在一起 */
+    val scratchDays: List<ScratchDay> = emptyList(),
     /** courseId -> 课程名，用于列表展示 */
     val courseNames: Map<Long, String> = emptyMap(),
     val transcribing: TranscribeUiState = TranscribeUiState.Idle,
@@ -81,6 +83,17 @@ data class NotesUiState(
     fun isTranscribing(noteId: Long): Boolean =
         transcribing is TranscribeUiState.Running && transcribing.noteId == noteId
 }
+
+/**
+ * 一天的「随手拍」。
+ *
+ * 一天一条笔记（见 [com.shangkele.core.model.ScratchNote]），所以这里的粒度是「天」，
+ * 列表上显示成「10-06 · 3 张照片」，点开就是那一天的照片时间轴。
+ */
+data class ScratchDay(
+    val note: Note,
+    val photoCount: Int,
+)
 
 /** 每 30 秒刷新的时间快照，避免每次都要重算一遍学期与周次。 */
 private data class TimeSnapshot(
@@ -154,12 +167,25 @@ class NotesViewModel @Inject constructor(
             )
         }
 
+    /**
+     * 「随手拍」+ 每天的照片张数。
+     *
+     * 两个流先合成一个，因为 `combine` 最多吃 5 个，而下面那个合并里已经占了 4 个位置。
+     */
+    private val scratchFlow: Flow<List<ScratchDay>> = combine(
+        repository.observeScratchNotes(),
+        repository.observePhotoCounts(),
+    ) { notes, counts ->
+        notes.map { note -> ScratchDay(note = note, photoCount = counts[note.id] ?: 0) }
+    }
+
     val uiState: StateFlow<NotesUiState> = combine(
         snapshotFlow,
         controller.state,
         repository.observeRecentNotes(),
+        scratchFlow,
         _transcribe,
-    ) { snapshot, recording, notes, transcribing ->
+    ) { snapshot, recording, notes, scratch, transcribing ->
         NotesUiState(
             recording = recording,
             currentCourseName = NowClassResolver.current(
@@ -170,6 +196,7 @@ class NotesViewModel @Inject constructor(
                 nowMinutes = snapshot.nowMinutes,
             )?.course?.name,
             recentNotes = notes,
+            scratchDays = scratch,
             courseNames = snapshot.courses.associate { it.id to it.name },
             transcribing = transcribing,
         )

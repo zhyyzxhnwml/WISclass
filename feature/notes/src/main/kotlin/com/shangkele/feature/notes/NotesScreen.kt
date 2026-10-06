@@ -10,6 +10,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -124,48 +125,41 @@ fun NotesScreen(
                 onTakePhoto = takePhoto,
             )
 
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+            // 整块只有一条 LazyColumn：以前是「随手拍那块 + 录音列表」两个滚动区，
+            // 嵌套滚动会互相抢手势，而且两块之间的顺序没法保证
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
-                    text = "最近的录音",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (state.recentNotes.isNotEmpty()) {
-                    Text(
-                        text = "长按可删除",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                // 「随手拍」单独一块，不跟录音混在一起。
+                // 它是照片不是录音：混进「最近的录音」里就成了几个写着 0:00 的东西，
+                // 想找某次录音还得先划过去。
+                if (state.scratchDays.isNotEmpty()) {
+                    item { SectionHeader("随手拍", "只有照片，没有录音") }
+                    items(state.scratchDays, key = { "scratch-" + it.note.id }) { day ->
+                        ScratchRow(day = day, onOpen = { onOpenNote(day.note.id) })
+                    }
+                    item { Spacer(Modifier.height(12.dp)) }
                 }
-            }
-            Spacer(Modifier.height(4.dp))
 
-            if (state.recentNotes.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(24.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "还没有录音。上课时点上面的按钮就能开始记笔记。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                item {
+                    SectionHeader(
+                        title = "最近的录音",
+                        hint = if (state.recentNotes.isEmpty()) null else "长按可删除",
                     )
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        bottom = 24.dp,
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
+
+                if (state.recentNotes.isEmpty()) {
+                    item {
+                        Text(
+                            text = "还没有录音。上课时点上面的按钮就能开始记笔记。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 16.dp),
+                        )
+                    }
+                } else {
                     items(state.recentNotes, key = { it.id }) { note ->
                         NoteRow(
                             note = note,
@@ -325,6 +319,68 @@ private fun RecordingPanel(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
+        }
+    }
+}
+
+/** 列表分区标题。右侧提示可以为空（没什么可说的就不写）。 */
+@Composable
+private fun SectionHeader(title: String, hint: String?) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (hint != null) {
+            Text(
+                text = hint,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * 一天的「随手拍」。
+ *
+ * 刻意做得比录音那条窄：它没有时长、没有转写、没有状态，
+ * 只有「哪一天、几张照片」，点进去才是照片本身。
+ */
+@Composable
+private fun ScratchRow(day: ScratchDay, onOpen: () -> Unit) {
+    val dateText = remember(day.note.dateEpochDay) {
+        LocalDate.ofEpochDay(day.note.dateEpochDay).format(DateTimeFormatter.ofPattern("MM-dd"))
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpen),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = dateText,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = "${day.photoCount} 张照片 · 第 ${day.note.weekIndex} 周",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(text = "›", style = MaterialTheme.typography.titleMedium)
         }
     }
 }

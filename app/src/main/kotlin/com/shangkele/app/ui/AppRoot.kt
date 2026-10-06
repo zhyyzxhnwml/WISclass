@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -28,6 +29,7 @@ import com.shangkele.feature.notes.NoteDetailScreen
 import com.shangkele.feature.notes.NoteDetailViewModel
 import com.shangkele.feature.notes.NotesScreen
 import com.shangkele.feature.onboarding.ImportScreen
+import com.shangkele.feature.schedule.AgendaScreen
 import com.shangkele.feature.schedule.ScheduleScreen
 import com.shangkele.feature.settings.CalendarScreen
 import com.shangkele.feature.settings.LlmConfigScreen
@@ -40,6 +42,9 @@ import com.shangkele.app.update.UpdateViewModel
 /** 路由表。新增页面时先在这里登记。 */
 object Routes {
     const val SCHEDULE = "schedule"
+
+    /** 日程：课 + 作业/待办合成的时间线。空档就是空余时间。 */
+    const val AGENDA = "agenda"
     const val IMPORT = "import"
     const val SETTINGS = "settings"
     const val NOTES = "notes"
@@ -69,6 +74,7 @@ private enum class MainTab(
     val icon: ImageVector,
 ) {
     SCHEDULE(Routes.SCHEDULE, "课表", Icons.Filled.DateRange),
+    AGENDA(Routes.AGENDA, "日程", Icons.Filled.List),
     NOTES(Routes.NOTES, "笔记", Icons.Filled.Create),
     SETTINGS(Routes.SETTINGS, "设置", Icons.Filled.Settings),
 }
@@ -116,6 +122,10 @@ fun AppRoot(
                     onOpenImport = { navController.navigate(Routes.IMPORT) },
                     onOpenCalendar = { navController.navigate(Routes.CALENDAR) },
                 )
+            }
+
+            composable(Routes.AGENDA) {
+                AgendaScreen()
             }
 
             composable(Routes.NOTES) {

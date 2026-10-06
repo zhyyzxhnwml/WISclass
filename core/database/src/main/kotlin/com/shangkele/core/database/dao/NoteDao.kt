@@ -21,8 +21,37 @@ interface NoteDao {
     @Query("SELECT * FROM note WHERE courseId = :courseId ORDER BY startedAtMs DESC")
     fun observeByCourse(courseId: Long): Flow<List<NoteEntity>>
 
-    @Query("SELECT * FROM note ORDER BY startedAtMs DESC LIMIT :limit")
+    /**
+     * 最近的**录音**笔记。
+     *
+     * 「随手拍」刻意排除在外：它是一条没有音频的照片集合，混在录音列表里
+     * 既看不出来是照片（时长显示 `0:00`），又白占着「最近的录音」这个位置。
+     * 界面上它单独一块，见 NotesScreen 的「随手拍」。
+     *
+     * `title IS NULL` 这一句不能省：SQL 里 `NULL NOT LIKE 'x'` 的结果是 NULL，
+     * 也就是 false —— 漏掉它，所有**没有标题**的录音会整批从列表里消失。
+     */
+    @Query(
+        """
+        SELECT * FROM note
+        WHERE title IS NULL OR title NOT LIKE '随手拍 · %'
+        ORDER BY startedAtMs DESC LIMIT :limit
+        """,
+    )
     fun observeRecent(limit: Int): Flow<List<NoteEntity>>
+
+    /** 最近的「随手拍」（一天一条）。 */
+    @Query(
+        """
+        SELECT * FROM note WHERE title LIKE '随手拍 · %'
+        ORDER BY dateEpochDay DESC LIMIT :limit
+        """,
+    )
+    fun observeScratch(limit: Int): Flow<List<NoteEntity>>
+
+    /** noteId → 照片张数。给「随手拍」列表显示「3 张照片」用。 */
+    @Query("SELECT noteId, COUNT(*) AS count FROM photo GROUP BY noteId")
+    fun observePhotoCounts(): Flow<List<NotePhotoCount>>
 
     @Query("SELECT * FROM note WHERE id = :noteId")
     suspend fun getById(noteId: Long): NoteEntity?
@@ -137,3 +166,6 @@ interface NoteDao {
     @Query("DELETE FROM photo WHERE id = :photoId")
     suspend fun deletePhoto(photoId: Long)
 }
+
+/** 一条笔记有几张照片。Room 用它接 [NoteDao.observePhotoCounts] 的投影结果。 */
+data class NotePhotoCount(val noteId: Long, val count: Int)

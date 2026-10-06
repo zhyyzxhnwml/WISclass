@@ -113,8 +113,8 @@ android {
         applicationId = "com.shangkele.app"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 36
-        versionName = "0.10.3-w6"
+        versionCode = 37
+        versionName = "0.10.4-w6"
         // ONNX Runtime 自带 4 个 ABI 的 .so，全打进去 APK 会白胖 3 倍。
         // 目标机只有荣耀 200（arm64-v8a），所以只留这一个。
         ndk {
