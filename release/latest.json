@@ -1,6 +1,6 @@
 {
-    "version":  "0.10.5-w6",
-    "notes":  "0.10.5-w6：出发提醒改成按教室坐标算距离 —— 到了教室在课表上点一下「我到教室了」，就记住这间教室的位置，之后它会按「你离教室多远 + 走过去要几分钟」决定什么时候提醒，已经在教室附近就不再打扰。还没采过坐标的教室，行为跟以前一样。",
-    "apkUrl":  "https://raw.githubusercontent.com/zhyyzxhnwml/WISclass/main/release/ShangKeLe-0.10.5-w6-release.apk",
-    "sizeBytes":  43792828
+    "version":  "0.10.6-w6",
+    "notes":  "0.10.6-w6：修好「更新第一次一定卡在正在安装」。改用系统的安装会话，它会先把安装包复制到自己那边再装 —— 以前是让系统去读我们进程里的文件，而系统要装的正是这个包，它得先杀掉我们，一杀文件就没了，所以第一次必卡。现在失败也会把系统给的原因说出来，不再无声无息。",
+    "apkUrl":  "https://raw.githubusercontent.com/zhyyzxhnwml/WISclass/main/release/ShangKeLe-0.10.6-w6-release.apk",
+    "sizeBytes":  43792860
 }
