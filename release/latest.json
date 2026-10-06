@@ -1,6 +1,6 @@
 {
-    "version":  "0.10.4-w6",
-    "notes":  "0.10.4-w6：新增「日程」页 —— 课和作业/待办合成一条时间线，没安排的日子不列出来，那些就是空余时间；过期的置顶标红，点一下就能勾掉。拍照不再和笔记混在一起：「随手拍」单独一块，一天一行，点开看那天的照片。",
-    "apkUrl":  "https://raw.githubusercontent.com/zhyyzxhnwml/WISclass/main/release/ShangKeLe-0.10.4-w6-release.apk",
-    "sizeBytes":  43776404
+    "version":  "0.10.5-w6",
+    "notes":  "0.10.5-w6：出发提醒改成按教室坐标算距离 —— 到了教室在课表上点一下「我到教室了」，就记住这间教室的位置，之后它会按「你离教室多远 + 走过去要几分钟」决定什么时候提醒，已经在教室附近就不再打扰。还没采过坐标的教室，行为跟以前一样。",
+    "apkUrl":  "https://raw.githubusercontent.com/zhyyzxhnwml/WISclass/main/release/ShangKeLe-0.10.5-w6-release.apk",
+    "sizeBytes":  43792828
 }
