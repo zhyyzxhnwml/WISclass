@@ -1,6 +1,6 @@
 {
-    "version":  "0.10.3-w6",
-    "notes":  "0.10.3-w6：桌面组件加「＋拍照」，随手拍下作业或重点，自动存进当天的「随手拍」笔记（按拍摄钟点排好）；拍照和录音转写会自动找出老师布置的作业，把「下周三前」这类原话换算成日期存进日程；笔记详情页新增「要做的事」（老师的原话 → 换算出的日期 · 还剩几天，过期标红）。",
-    "apkUrl":  "https://raw.githubusercontent.com/zhyyzxhnwml/WISclass/main/release/ShangKeLe-0.10.3-w6-release.apk",
-    "sizeBytes":  43760016
+    "version":  "0.10.4-w6",
+    "notes":  "0.10.4-w6：新增「日程」页 —— 课和作业/待办合成一条时间线，没安排的日子不列出来，那些就是空余时间；过期的置顶标红，点一下就能勾掉。拍照不再和笔记混在一起：「随手拍」单独一块，一天一行，点开看那天的照片。",
+    "apkUrl":  "https://raw.githubusercontent.com/zhyyzxhnwml/WISclass/main/release/ShangKeLe-0.10.4-w6-release.apk",
+    "sizeBytes":  43776404
 }
