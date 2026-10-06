@@ -3,6 +3,7 @@ package com.shangkele.core.ai.llm
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -13,6 +14,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -74,42 +76,112 @@ class OpenAiCompatibleClient @Inject constructor() {
         temperature: Double = 0.2,
     ): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
-            val payload = buildJsonObject {
-                put("model", model)
-                put("temperature", temperature)
-                put("max_tokens", maxTokens)
-                putJsonArray("messages") {
-                    addJsonObject {
-                        put("role", "system")
-                        put("content", systemPrompt)
+            send(
+                baseUrl = baseUrl,
+                apiKey = apiKey,
+                payload = buildJsonObject {
+                    put("model", model)
+                    put("temperature", temperature)
+                    put("max_tokens", maxTokens)
+                    putJsonArray("messages") {
+                        addJsonObject {
+                            put("role", "system")
+                            put("content", systemPrompt)
+                        }
+                        addJsonObject {
+                            put("role", "user")
+                            put("content", userPrompt)
+                        }
                     }
-                    addJsonObject {
-                        put("role", "user")
-                        put("content", userPrompt)
+                },
+            )
+        }
+    }
+
+    /**
+     * 带一张图发一次对话（视觉模型）。
+     *
+     * 与 [chat] 唯一的区别是 `content` 由字符串变成数组：文字片段 + 一个 `image_url`。
+     * 图片用 data URL（`data:image/jpeg;base64,...`）内联，不用先上传 ——
+     * 少一次上传就少一个失败点。
+     *
+     * **图必须先压过**：一张 1200 万像素的照片 base64 之后十几 MB，多数接口直接 413；
+     * 压到长边 1024 / JPEG 85 之后约 150~250KB。压缩在调用方完成（见 NotePhotoStore）。
+     *
+     * 模型不支持看图时，服务端通常回 400 并说明「不支持图片输入」——
+     * 那条信息会原样透出来，不会静默变成一个空结果。
+     */
+    suspend fun chatWithImage(
+        baseUrl: String,
+        apiKey: String,
+        model: String,
+        systemPrompt: String,
+        userPrompt: String,
+        imageBase64: String,
+        imageMediaType: String = "image/jpeg",
+        maxTokens: Int = 2048,
+        temperature: Double = 0.2,
+    ): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            send(
+                baseUrl = baseUrl,
+                apiKey = apiKey,
+                payload = buildJsonObject {
+                    put("model", model)
+                    put("temperature", temperature)
+                    put("max_tokens", maxTokens)
+                    putJsonArray("messages") {
+                        addJsonObject {
+                            put("role", "system")
+                            put("content", systemPrompt)
+                        }
+                        addJsonObject {
+                            put("role", "user")
+                            putJsonArray("content") {
+                                addJsonObject {
+                                    put("type", "text")
+                                    put("text", userPrompt)
+                                }
+                                addJsonObject {
+                                    put("type", "image_url")
+                                    putJsonObject("image_url") {
+                                        put("url", "data:$imageMediaType;base64,$imageBase64")
+                                    }
+                                }
+                            }
+                        }
                     }
-                }
+                },
+            )
+        }
+    }
+
+    /**
+     * 真正发请求、抠出正文。
+     *
+     * 两个入口共用一份，免得错误处理（401/404/429 的翻译、空内容判定）
+     * 写两遍 —— 那种重复迟早会只改一边。
+     */
+    private fun send(baseUrl: String, apiKey: String, payload: JsonObject): String {
+        val request = Request.Builder()
+            .url(baseUrl.trimEnd('/') + "/chat/completions")
+            .header("Authorization", "Bearer $apiKey")
+            .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+
+        http.newCall(request).execute().use { response ->
+            val text = response.body?.string().orEmpty()
+            if (!response.isSuccessful) error(describeHttpError(response.code, text))
+
+            val root = json.parseToJsonElement(text).jsonObject
+            val content = root["choices"]?.jsonArray?.firstOrNull()
+                ?.jsonObject?.get("message")?.jsonObject?.get("content")
+                ?.jsonPrimitive?.contentOrNull
+
+            if (content.isNullOrBlank()) {
+                error("模型返回了空内容。原文：${text.take(300)}")
             }
-
-            val request = Request.Builder()
-                .url(baseUrl.trimEnd('/') + "/chat/completions")
-                .header("Authorization", "Bearer $apiKey")
-                .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
-                .build()
-
-            http.newCall(request).execute().use { response ->
-                val text = response.body?.string().orEmpty()
-                if (!response.isSuccessful) error(describeHttpError(response.code, text))
-
-                val root = json.parseToJsonElement(text).jsonObject
-                val content = root["choices"]?.jsonArray?.firstOrNull()
-                    ?.jsonObject?.get("message")?.jsonObject?.get("content")
-                    ?.jsonPrimitive?.contentOrNull
-
-                if (content.isNullOrBlank()) {
-                    error("模型返回了空内容。原文：${text.take(300)}")
-                }
-                content
-            }
+            return content
         }
     }
 

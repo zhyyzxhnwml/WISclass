@@ -32,6 +32,15 @@ interface NoteDao {
     suspend fun getByStatus(status: String): List<NoteEntity>
 
     /**
+     * 找当天那条「随手拍」笔记（桌面小组件拍照的落点）。没有则返回 null。
+     *
+     * 靠**标题**认，而不是「`audioPath` 为空」：录音中途失败时 `audioPath` 也是 null，
+     * 那样照片会被塞进一条失败的录音笔记里，而真正的「随手拍」永远找不到。
+     */
+    @Query("SELECT * FROM note WHERE title LIKE '随手拍 · %' AND dateEpochDay = :day ORDER BY id DESC LIMIT 1")
+    suspend fun getScratchNote(day: Long): NoteEntity?
+
+    /**
      * 删除笔记。转写片段与摘要靠外键 CASCADE 一并删除
      * （见 `TranscriptSegmentEntity` / `SummaryEntity` 的 onDelete）。
      */

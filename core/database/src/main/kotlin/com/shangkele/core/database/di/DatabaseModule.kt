@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.shangkele.core.database.ALL_MIGRATIONS
 import com.shangkele.core.database.ShangKeLeDatabase
+import com.shangkele.core.database.dao.AssignmentDao
 import com.shangkele.core.database.dao.ChangeLogDao
 import com.shangkele.core.database.dao.CourseDao
 import com.shangkele.core.database.dao.NoteDao
@@ -41,4 +42,7 @@ object DatabaseModule {
 
     @Provides
     fun provideNoteDao(db: ShangKeLeDatabase): NoteDao = db.noteDao()
+
+    @Provides
+    fun provideAssignmentDao(db: ShangKeLeDatabase): AssignmentDao = db.assignmentDao()
 }

@@ -6,14 +6,18 @@ import androidx.lifecycle.viewModelScope
 import com.shangkele.core.ai.transcribe.NoteTranscriber
 import com.shangkele.core.context.photos.NotePhotoStore
 import com.shangkele.core.database.repository.ScheduleRepository
+import com.shangkele.core.model.Assignment
 import com.shangkele.core.model.Note
 import com.shangkele.core.model.NotePhoto
 import com.shangkele.core.model.NoteSummary
+import com.shangkele.core.model.ScratchNote
 import com.shangkele.core.model.TranscriptSegment
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.LocalDate
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
 import javax.inject.Inject
@@ -25,9 +29,19 @@ data class NoteDetailUiState(
     val summary: NoteSummary? = null,
     val segments: List<TranscriptSegment> = emptyList(),
     val photos: List<NotePhoto> = emptyList(),
+    /** 从这条笔记里读出来的作业 / 待办。 */
+    val assignments: List<Assignment> = emptyList(),
 ) {
     /** 转写与摘要都还没有，界面上要给出「去转写」的引导。 */
     val needsTranscript: Boolean get() = segments.isEmpty()
+
+    /**
+     * 这条是不是「随手拍」（只有照片、没有录音）。
+     *
+     * 界面据此收起整条转写路径：没有音频却摆一个「转写」按钮，
+     * 点下去只会得到「录音文件已丢失」—— 用户看不懂，也没法修。
+     */
+    val isScratch: Boolean get() = ScratchNote.isScratch(note?.title)
 
     /**
      * 转写句子与照片按时间拼成的一条时间轴。
@@ -43,6 +57,7 @@ class NoteDetailViewModel @Inject constructor(
     private val repository: ScheduleRepository,
     private val transcriber: NoteTranscriber,
     private val photoStore: NotePhotoStore,
+    private val homeworkScanner: HomeworkScanner,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -62,6 +77,13 @@ class NoteDetailViewModel @Inject constructor(
 
     init {
         load()
+        // 待办单独用 Flow 跟着库走：识别是在后台跑的（见 HomeworkScanner），
+        // 它写进库的那一刻这一页就该更新，而不是要用户退出去再进来一次
+        viewModelScope.launch {
+            repository.observeAssignmentsOfNote(noteId).collect { list ->
+                _state.update { it.copy(assignments = list) }
+            }
+        }
     }
 
     private fun load() {
@@ -80,6 +102,55 @@ class NoteDetailViewModel @Inject constructor(
                 photos = repository.getNotePhotos(noteId),
             )
         }
+    }
+
+    // ---- 读作业 ----
+
+    /**
+     * 手动把这条笔记的照片和转写都读一遍，找老师布置的事。
+     *
+     * 后台那条路径（拍完自动读）在进程被杀时会丢，所以这个入口必须留着 ——
+     * 否则用户遇到一次失败就再也没有第二次机会。
+     *
+     * 模型抽不出日期时不编日期，只留老师的原话（见 [HomeworkDueParser]）。
+     */
+    fun scanForHomework() {
+        if (_busy.value) return
+        viewModelScope.launch {
+            _busy.value = true
+            val today = _state.value.note?.dateEpochDay ?: LocalDate.now().toEpochDay()
+
+            var total = 0
+            var firstError: String? = null
+            val photos = _state.value.photos
+
+            photos.forEach { photo ->
+                homeworkScanner.scanPhoto(noteId, photo.path, today)
+                    .onSuccess { total += it }
+                    .onFailure { if (firstError == null) firstError = it.message }
+            }
+            homeworkScanner.scanTranscript(noteId, today)
+                .onSuccess { total += it }
+                .onFailure { if (firstError == null) firstError = it.message }
+
+            _message.value = when {
+                total > 0 -> "读到 $total 条待办"
+                firstError != null -> "没读到新待办：$firstError"
+                else -> "没读到要做的事"
+            }
+            _busy.value = false
+        }
+    }
+
+    // ---- 待办 ----
+
+    fun setAssignmentDone(id: Long, done: Boolean) {
+        viewModelScope.launch { repository.setAssignmentDone(id, done) }
+    }
+
+    /** 删掉抽错的待办。只删这一行，笔记和照片都留着。 */
+    fun deleteAssignment(id: Long) {
+        viewModelScope.launch { repository.deleteAssignment(id) }
     }
 
     // ---- 拍照 ----
@@ -135,6 +206,9 @@ class NoteDetailViewModel @Inject constructor(
                     createdAt = System.currentTimeMillis(),
                 ),
             )
+
+            // 补拍的照片也立刻读一遍。这一步要联网、几秒才回，丢后台不挡用户
+            homeworkScanner.scanPhotoInBackground(note.id, file.absolutePath, note.dateEpochDay)
             _message.value = "已加入这条笔记"
             load()
         }

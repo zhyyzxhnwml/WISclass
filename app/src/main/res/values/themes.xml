@@ -8,4 +8,16 @@
     <style name="Theme.ShangKeLe" parent="@android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">#FAFAFA</item>
     </style>
+
+    <!--
+      「拍一下」中转页用：完全透明、没有标题栏。
+
+      那一页存在的意义只是「有个 Activity 生命周期能调起系统相机」，
+      用户不该看到任何界面 —— 从桌面点「拍照」应当直接看到相机取景框。
+    -->
+    <style name="Theme.ShangKeLe.Transparent" parent="@android:style/Theme.Translucent.NoTitleBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
 </resources>

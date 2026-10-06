@@ -1,5 +1,6 @@
 package com.shangkele.app.widget
 
+import android.content.ComponentName
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
@@ -7,6 +8,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.LocalContext
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
@@ -30,6 +32,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.shangkele.app.MainActivity
+import com.shangkele.app.capture.QuickCaptureActivity
 
 /**
  * 今日课表小组件。
@@ -75,23 +78,46 @@ private fun WidgetContent(state: WidgetState) {
             .cornerRadius(16.dp)
             .padding(12.dp),
     ) {
+        val context = LocalContext.current
+
         // 只有标题行可点，不整块可点 —— 否则点击会和列表的滚动手势抢事件
         Row(
-            modifier = GlanceModifier
-                .fillMaxWidth()
-                .clickable(actionStartActivity<MainActivity>()),
+            modifier = GlanceModifier.fillMaxWidth(),
             verticalAlignment = Alignment.Vertical.CenterVertically,
         ) {
-            Text(
-                text = "上课啦",
-                style = TextStyle(color = Primary, fontSize = 13.sp, fontWeight = FontWeight.Bold),
-            )
-            if (state.weekLabel.isNotEmpty()) {
-                Spacer(GlanceModifier.width(6.dp))
-                Text(text = state.weekLabel, style = TextStyle(color = TextSub, fontSize = 11.sp))
+            Row(
+                modifier = GlanceModifier
+                    .defaultWeight()
+                    .clickable(actionStartActivity<MainActivity>()),
+                verticalAlignment = Alignment.Vertical.CenterVertically,
+            ) {
+                Text(
+                    text = "上课啦",
+                    style = TextStyle(color = Primary, fontSize = 13.sp, fontWeight = FontWeight.Bold),
+                )
+                if (state.weekLabel.isNotEmpty()) {
+                    Spacer(GlanceModifier.width(6.dp))
+                    Text(text = state.weekLabel, style = TextStyle(color = TextSub, fontSize = 11.sp))
+                }
             }
-            // TODO(下一轮)：这里会加一个「拍照」入口。
-            // 现在先不放 —— 拍照功能本身还没做，放个点了没反应的按钮比不放更糟。
+
+            // 「拍照」刻意**不**套在标题那一行里面：小组件渲染出来是 RemoteViews，
+            // 点击靠 setOnClickPendingIntent 挂在具体视图上，嵌套在另一个可点区域里时
+            // 这一下究竟谁收到，在 MagicOS 上并不确定。单独占一格最稳。
+            //
+            // 用 ComponentName 而不是 Intent：Glance 1.1 只提供
+            // `actionStartActivity(ComponentName)` 与 `actionStartActivity<T>()` 两种重载，
+            // **没有**收 Intent 的那个（传 Intent 会报「actual type is Intent,
+            // but ComponentName was expected」）。要带参数得走 ActionParameters。
+            Text(
+                text = "＋拍照",
+                style = TextStyle(color = Primary, fontSize = 12.sp, fontWeight = FontWeight.Bold),
+                modifier = GlanceModifier
+                    .clickable(
+                        actionStartActivity(ComponentName(context, QuickCaptureActivity::class.java)),
+                    )
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            )
         }
 
         Spacer(GlanceModifier.height(8.dp))

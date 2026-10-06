@@ -48,16 +48,20 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.shangkele.core.model.Assignment
 import com.shangkele.core.model.NotePhoto
 import com.shangkele.core.model.NoteSummary
+import com.shangkele.core.model.ScratchNote
 import com.shangkele.feature.notes.component.rememberPhotoCapture
 import com.shangkele.feature.notes.component.rememberPhotoThumbnail
 import kotlinx.coroutines.launch
 import java.io.File
+import java.time.LocalDate
 
 /**
  * 笔记详情：**摘要 + 时间轴**。
@@ -79,6 +83,7 @@ fun NoteDetailScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var pendingDelete by remember { mutableStateOf<NotePhoto?>(null) }
+    var pendingAssignmentDelete by remember { mutableStateOf<Assignment?>(null) }
 
     val takePhoto = rememberPhotoCapture(
         createTarget = viewModel::beginPhoto,
@@ -101,8 +106,11 @@ fun NoteDetailScreen(
                 actions = {
                     // 课后补拍的入口在这里；上课时的拍照在录音页（那里知道录音进度）
                     TextButton(onClick = takePhoto, enabled = state.note != null) { Text("加照片") }
-                    TextButton(onClick = viewModel::transcribe, enabled = !busy) {
-                        Text(if (state.needsTranscript) "转写" else "重新转写")
+                    // 「随手拍」没有录音，转写点了必然报「录音文件已丢失」——干脆不给这个入口
+                    if (!state.isScratch) {
+                        TextButton(onClick = viewModel::transcribe, enabled = !busy) {
+                            Text(if (state.needsTranscript) "转写" else "重新转写")
+                        }
                     }
                 },
             )
@@ -126,6 +134,17 @@ fun NoteDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 item { MetaCard(state, busy, onTranscribe = viewModel::transcribe) }
+
+                // 放在摘要之前：这是「还得做什么」—— 比「这节课讲了什么」更急
+                item {
+                    AssignmentCard(
+                        state = state,
+                        busy = busy,
+                        onScan = viewModel::scanForHomework,
+                        onToggle = viewModel::setAssignmentDone,
+                        onDelete = { pendingAssignmentDelete = it },
+                    )
+                }
 
                 if (state.summary != null) {
                     item { SummaryCard(state.summary!!) }
@@ -177,10 +196,30 @@ fun NoteDetailScreen(
             },
             dismissButton = {
                 TextButton(onClick = { pendingDelete = null }) { Text("取消") }
-            },
-        )
-    }
-}
+                },
+                )
+                }
+
+                pendingAssignmentDelete?.let { item ->
+                AlertDialog(
+                onDismissRequest = { pendingAssignmentDelete = null },
+                title = { Text("删掉这条待办？") },
+                // 说清楚删的只是日程里这一行：识别难免有错，得能撤掉
+                text = { Text("「${item.title}」\n\n只删日程里的这一条，笔记和照片都还在。") },
+                confirmButton = {
+                TextButton(
+                onClick = {
+                viewModel.deleteAssignment(item.id)
+                pendingAssignmentDelete = null
+                },
+                ) { Text("删除") }
+                },
+                dismissButton = {
+                TextButton(onClick = { pendingAssignmentDelete = null }) { Text("取消") }
+                },
+                )
+                }
+                }
 
 @Composable
 private fun MetaCard(state: NoteDetailUiState, busy: Boolean, onTranscribe: () -> Unit) {
@@ -188,19 +227,24 @@ private fun MetaCard(state: NoteDetailUiState, busy: Boolean, onTranscribe: () -
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = state.courseName ?: "临时录音",
+                text = if (state.isScratch) ScratchNote.TITLE_PREFIX else (state.courseName ?: "临时录音"),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "第 ${note.weekIndex} 周 · ${formatDuration(note.durationMs)} · " +
-                    "${"%.1f".format(note.audioSizeBytes / 1024.0 / 1024.0)} MB" +
-                    if (state.photos.isNotEmpty()) " · ${state.photos.size} 张照片" else "",
+                // 「随手拍」没有录音，写「00:00 · 0.0 MB」看起来像录音坏了
+                text = if (state.isScratch) {
+                    "第 ${note.weekIndex} 周 · ${state.photos.size} 张照片"
+                } else {
+                    "第 ${note.weekIndex} 周 · ${formatDuration(note.durationMs)} · " +
+                        "${"%.1f".format(note.audioSizeBytes / 1024.0 / 1024.0)} MB" +
+                        if (state.photos.isNotEmpty()) " · ${state.photos.size} 张照片" else ""
+                },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (state.needsTranscript) {
+            if (state.needsTranscript && !state.isScratch) {
                 Spacer(Modifier.height(10.dp))
                 Text(
                     text = "这条还没转写。点右上角「转写」把录音变成文字与要点。",
@@ -374,6 +418,120 @@ private fun TimelinePhotoRow(
                 )
             }
         }
+    }
+}
+
+/**
+ * 「要做的事」—— 从板书照片和转写里读出来的作业 / 待办。
+ *
+ * 有意**总是显示**：一条都没读出来时也得有个地方能再点一次。
+ * 只在有内容时才显示的话，第一次失败（没配模型、网络不通）之后
+ * 用户就再也找不到入口了。
+ */
+@Composable
+private fun AssignmentCard(
+    state: NoteDetailUiState,
+    busy: Boolean,
+    onScan: () -> Unit,
+    onToggle: (Long, Boolean) -> Unit,
+    onDelete: (Assignment) -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = "要做的事",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                TextButton(onClick = onScan, enabled = !busy) {
+                    Text(if (state.assignments.isEmpty()) "读一遍" else "再读一遍")
+                }
+            }
+
+            if (state.assignments.isEmpty()) {
+                Text(
+                    text = if (state.photos.isEmpty() && state.needsTranscript) {
+                        "这条笔记还没有照片、也没转写，没东西可读。"
+                    } else {
+                        "还没读过。点「读一遍」，让它从板书照片和转写里找找老师布置了什么。"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                state.assignments.forEach { item ->
+                    AssignmentRow(item = item, onToggle = onToggle, onDelete = onDelete)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AssignmentRow(
+    item: Assignment,
+    onToggle: (Long, Boolean) -> Unit,
+    onDelete: (Assignment) -> Unit,
+) {
+    // 「还有几天」只需要「今天」，而它一天才变一次，不必跟着每次重组重算
+    val today = remember { LocalDate.now().toEpochDay() }
+    val left = item.daysLeft(today)
+    val overdue = !item.done && left != null && left < 0
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .combinedClickable(onClick = { onToggle(item.id, !item.done) }),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = if (item.done) "☑" else "☐",
+                style = MaterialTheme.typography.titleMedium,
+                color = if (item.done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.width(8.dp))
+            Column {
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textDecoration = if (item.done) TextDecoration.LineThrough else null,
+                )
+                Text(
+                    // 「下周三前 → 10-14 · 还有 3 天」：原话和换算出的日期都摆出来，
+                    // 用户扫一眼就知道有没有理解错
+                    text = buildString {
+                        append(item.dueLabel)
+                        if (!item.done && left != null) {
+                            append(" · ")
+                            append(
+                                when {
+                                    left < 0 -> "已过期 ${-left} 天"
+                                    left == 0L -> "今天到期"
+                                    else -> "还有 $left 天"
+                                },
+                            )
+                        }
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    // 过期标红：这是整页最该被看见的一句话
+                    color = if (overdue) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
+        }
+        TextButton(onClick = { onDelete(item) }) { Text("删") }
     }
 }
 

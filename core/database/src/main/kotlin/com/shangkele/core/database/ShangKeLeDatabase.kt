@@ -4,6 +4,7 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.shangkele.core.database.converter.Converters
+import com.shangkele.core.database.dao.AssignmentDao
 import com.shangkele.core.database.dao.ChangeLogDao
 import com.shangkele.core.database.dao.CourseDao
 import com.shangkele.core.database.dao.NoteDao
@@ -72,6 +73,8 @@ abstract class ShangKeLeDatabase : RoomDatabase() {
     abstract fun changeLogDao(): ChangeLogDao
 
     abstract fun noteDao(): NoteDao
+
+    abstract fun assignmentDao(): AssignmentDao
 
     companion object {
         const val NAME = "shangkele.db"

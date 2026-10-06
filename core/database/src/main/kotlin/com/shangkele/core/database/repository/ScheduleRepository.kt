@@ -1,14 +1,17 @@
 package com.shangkele.core.database.repository
 
+import com.shangkele.core.database.dao.AssignmentDao
 import com.shangkele.core.database.dao.ChangeLogDao
 import com.shangkele.core.database.dao.CourseDao
 import com.shangkele.core.database.dao.NoteDao
 import com.shangkele.core.database.dao.SemesterDao
 import com.shangkele.core.database.dao.TimeSlotDao
 import com.shangkele.core.database.entity.ChangeLogEntity
+import com.shangkele.core.database.entity.NoteEntity
 import com.shangkele.core.database.entity.SemesterEntity
 import com.shangkele.core.database.mapper.toDomain
 import com.shangkele.core.database.mapper.toEntity
+import com.shangkele.core.model.Assignment
 import com.shangkele.core.model.Course
 import com.shangkele.core.model.Note
 import com.shangkele.core.model.NotePhoto
@@ -16,9 +19,11 @@ import com.shangkele.core.model.NoteStatus
 import com.shangkele.core.model.NoteSummary
 import com.shangkele.core.model.TranscriptSegment
 import com.shangkele.core.model.SchoolDefaults
+import com.shangkele.core.model.ScratchNote
 import com.shangkele.core.model.SemesterEdit
 import com.shangkele.core.model.Semester
 import com.shangkele.core.model.TimeSlot
+import com.shangkele.core.model.WeekCalculator
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -36,6 +41,7 @@ class ScheduleRepository @Inject constructor(
     private val timeSlotDao: TimeSlotDao,
     private val changeLogDao: ChangeLogDao,
     private val noteDao: NoteDao,
+    private val assignmentDao: AssignmentDao,
 ) {
 
     fun observeActiveSemester(): Flow<Semester?> =
@@ -226,6 +232,45 @@ class ScheduleRepository @Inject constructor(
 
     suspend fun createNote(note: Note): Long = noteDao.insert(note.toEntity())
 
+    /**
+     * 取出（必要时新建）当天那条「随手拍」笔记 —— 桌面小组件拍照的落点。
+     *
+     * 返回 null 表示**还没有学期**。这里刻意不造一条 `semesterId = 0` 的孤儿笔记：
+     * 那种行落库后再也筛不出来，「按学期清理 / 备份」也会漏掉它。
+     * 让调用方明确提示「先导入一次课表」，比留一堆查不到的数据好。
+     */
+    suspend fun ensureScratchNote(todayEpochDay: Long, nowMs: Long): Note? {
+        noteDao.getScratchNote(todayEpochDay)?.let { return it.toDomain() }
+
+        val semester = semesterDao.getActive() ?: return null
+        val noteId = noteDao.insert(
+            NoteEntity(
+                courseId = null,
+                semesterId = semester.id,
+                weekIndex = WeekCalculator.currentWeek(
+                    semesterStartEpochDay = semester.startDateEpochDay,
+                    todayEpochDay = todayEpochDay,
+                    totalWeeks = semester.totalWeeks,
+                ),
+                dateEpochDay = todayEpochDay,
+                // 起点定在当天 0 点 —— 照片的偏移量因此就等于拍摄钟点，见 ScratchNote
+                startedAtMs = ScratchNote.startOfDayMs(todayEpochDay),
+                durationMs = 0L,
+                audioPath = null,
+                audioSizeBytes = 0L,
+                audioKept = true,
+                transcriptText = null,
+                liveTranscriptText = null,
+                // 直接落 DONE：本来就没有录音，谈不上转写和摘要。
+                // 停在 RECORDED 会被「找回没转写的笔记」那类逻辑反复捞出来。
+                status = NoteStatus.DONE.name,
+                title = ScratchNote.titleFor(todayEpochDay),
+                createdAt = nowMs,
+            ),
+        )
+        return noteDao.getById(noteId)?.toDomain()
+    }
+
     suspend fun finishNote(
         noteId: Long,
         audioPath: String?,
@@ -269,6 +314,32 @@ class ScheduleRepository @Inject constructor(
     suspend fun addNotePhoto(photo: NotePhoto): Long = noteDao.insertPhoto(photo.toEntity())
 
     suspend fun notePhotoCount(noteId: Long): Int = noteDao.photoCount(noteId)
+
+    // ---- 作业 / 待办 ----
+
+    fun observeAssignments(): Flow<List<Assignment>> =
+        assignmentDao.observeAll().map { list -> list.map { it.toDomain() } }
+
+    fun observeAssignmentsOfNote(noteId: Long): Flow<List<Assignment>> =
+        assignmentDao.observeByNote(noteId).map { list -> list.map { it.toDomain() } }
+
+    /**
+     * 存一条抽出来的作业。**同一条笔记里标题重复的会被跳过**。
+     *
+     * 去重不是洁癖：照片会被重读（第一次失败重试、用户手动再读一遍、
+     * 转写完成后再从文字里抽一次），不去重的话日程里会并排出现两行一模一样的作业。
+     *
+     * @return 真正写入返回新 id；判定为重复时返回 null
+     */
+    suspend fun addAssignment(assignment: Assignment): Long? {
+        if (assignment.title.isBlank()) return null
+        assignmentDao.findByNoteAndTitle(assignment.noteId, assignment.title)?.let { return null }
+        return assignmentDao.insert(assignment.toEntity())
+    }
+
+    suspend fun setAssignmentDone(id: Long, done: Boolean) = assignmentDao.setDone(id, done)
+
+    suspend fun deleteAssignment(id: Long) = assignmentDao.delete(id)
 
     /** 删一张照片：先删库再删文件，理由同 [deleteNote]。 */
     suspend fun deleteNotePhoto(photoId: Long): Boolean {

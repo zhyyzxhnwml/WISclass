@@ -54,6 +54,21 @@
         </activity>
 
         <!--
+          「拍一下」中转页：桌面小组件点「拍照」时用 PendingIntent 把它拉起来，
+          它去调系统相机、把照片写进当天的「随手拍」笔记，然后立刻 finish()。
+
+          exported=false：只有本应用自己的小组件会拉起它。
+          excludeFromRecents：它没有界面，不该在最近任务里占一格。
+          **刻意不写 noHistory**：那会让它在相机切到前台时被系统立刻 finish，
+          拍照结果就再也回不来了 —— 表现是「点了没反应」，而且不报错。
+        -->
+        <activity
+            android:name=".capture.QuickCaptureActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:theme="@style/Theme.ShangKeLe.Transparent" />
+
+        <!--
           exported=true 是给桌面（另一个应用）投递 APPWIDGET_UPDATE 用的。
           它唯一能做的事就是按当前课表重画一次小组件，被外部触发也无害。
         -->

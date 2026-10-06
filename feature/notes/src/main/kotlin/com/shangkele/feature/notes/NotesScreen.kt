@@ -51,6 +51,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shangkele.core.context.recording.RecordingService
 import com.shangkele.core.model.Note
+import com.shangkele.core.model.ScratchNote
 import com.shangkele.feature.notes.component.rememberPhotoCapture
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -343,6 +344,8 @@ private fun NoteRow(
     }
     val busy = transcribing is TranscribeUiState.DownloadingModel || transcribing is TranscribeUiState.Running
     val transcript = note.transcriptText?.takeIf { it.isNotBlank() }
+    // 「随手拍」没有录音：时长、转写、状态那一整套路子对它都不成立，得换一套说法
+    val scratch = ScratchNote.isScratch(note.title)
 
     Card(
         modifier = Modifier
@@ -357,12 +360,17 @@ private fun NoteRow(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = courseName ?: "临时录音",
+                        text = if (scratch) ScratchNote.TITLE_PREFIX else (courseName ?: "临时录音"),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        text = "$dateText · 第 ${note.weekIndex} 周 · ${formatDuration(note.durationMs)}",
+                        // 没有录音还写「0:00」，看起来像录音坏了
+                        text = if (scratch) {
+                            "$dateText · 第 ${note.weekIndex} 周 · 只有照片，没有录音"
+                        } else {
+                            "$dateText · 第 ${note.weekIndex} 周 · ${formatDuration(note.durationMs)}"
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -379,6 +387,17 @@ private fun NoteRow(
             }
 
             when {
+                // 「随手拍」没有录音，不给它转写入口 —— 点下去必然报
+                // 「录音文件已丢失」，而用户完全不知道为什么
+                scratch -> {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "照片按拍摄时间排在笔记里，点开就能看",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+
                 // 模型下载是首次使用绕不过的一步，明确把 230MB 的事说清楚
                 transcribing is TranscribeUiState.DownloadingModel -> {
                     Spacer(Modifier.height(6.dp))

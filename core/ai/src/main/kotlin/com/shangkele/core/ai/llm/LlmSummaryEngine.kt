@@ -133,19 +133,9 @@ class LlmSummaryEngine @Inject constructor(
     }
 
     /**
-     * 从模型输出里抠出 JSON。
-     *
-     * 即使 prompt 要求「只输出 JSON」，模型仍经常套一层 ```json 代码块，
-     * 或者在前后加一句「好的，以下是结果：」。所以按第一个 `{` 到最后一个 `}`
-     * 截取，而不是假设整个响应就是 JSON。
+     * 从模型输出里抠出 JSON。实现在 [ModelJson]，作业抽取那边共用同一份。
      */
-    internal fun extractJsonObject(raw: String): String? {
-        val cleaned = raw.replace("```json", "").replace("```", "")
-        val start = cleaned.indexOf('{')
-        val end = cleaned.lastIndexOf('}')
-        if (start < 0 || end <= start) return null
-        return cleaned.substring(start, end + 1)
-    }
+    internal fun extractJsonObject(raw: String): String? = ModelJson.objectBody(raw)
 
     /**
      * 按句子边界把长转写切开，避免把一句话劈成两半。
