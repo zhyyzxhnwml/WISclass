@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    让系统相机应用能把照片写进本应用的私有目录。
+
+    `external-files-path` 映射的是 Context.getExternalFilesDir(null)，
+    所以 path 要写成 "Pictures/" —— 与 NotePhotoStore.newPhotoFile() 里
+    用的 Environment.DIRECTORY_PICTURES + "photos" 前缀对得上。
+
+    这里只开放这一个目录：FileProvider 的作用就是把「本应用私有文件」
+    临时授权给另一个应用，范围写得越窄越好。
+-->
+<paths>
+    <external-files-path name="photos" path="Pictures/" />
+
+    <!-- 自动更新的 APK 下在 cacheDir/updates/，装完系统会自己清掉缓存 -->
+    <cache-path name="updates" path="updates/" />
+</paths>

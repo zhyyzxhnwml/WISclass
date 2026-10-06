@@ -1,0 +1,183 @@
+package com.shangkele.feature.notes
+
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.shangkele.core.ai.transcribe.NoteTranscriber
+import com.shangkele.core.context.photos.NotePhotoStore
+import com.shangkele.core.database.repository.ScheduleRepository
+import com.shangkele.core.model.Note
+import com.shangkele.core.model.NotePhoto
+import com.shangkele.core.model.NoteSummary
+import com.shangkele.core.model.TranscriptSegment
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import java.io.File
+import javax.inject.Inject
+
+data class NoteDetailUiState(
+    val loading: Boolean = true,
+    val note: Note? = null,
+    val courseName: String? = null,
+    val summary: NoteSummary? = null,
+    val segments: List<TranscriptSegment> = emptyList(),
+    val photos: List<NotePhoto> = emptyList(),
+) {
+    /** 转写与摘要都还没有，界面上要给出「去转写」的引导。 */
+    val needsTranscript: Boolean get() = segments.isEmpty()
+
+    /**
+     * 转写句子与照片按时间拼成的一条时间轴。
+     *
+     * 这是拍照这个功能真正值钱的地方：回看时不是「一堆图 + 一堆字」，
+     * 而是「老师讲到这句时，板书是这样」。
+     */
+    val timeline: List<TimelineItem> get() = buildTimeline(segments, photos)
+}
+
+@HiltViewModel
+class NoteDetailViewModel @Inject constructor(
+    private val repository: ScheduleRepository,
+    private val transcriber: NoteTranscriber,
+    private val photoStore: NotePhotoStore,
+    savedStateHandle: SavedStateHandle,
+) : ViewModel() {
+
+    /** 正在等相机返回的那张照片的目标文件。 */
+    private var pendingPhoto: File? = null
+
+    private val noteId: Long = savedStateHandle.get<String>(ARG_NOTE_ID)?.toLongOrNull() ?: 0L
+
+    private val _state = MutableStateFlow(NoteDetailUiState())
+    val state: StateFlow<NoteDetailUiState> = _state.asStateFlow()
+
+    private val _message = MutableStateFlow<String?>(null)
+    val message: StateFlow<String?> = _message.asStateFlow()
+
+    private val _busy = MutableStateFlow(false)
+    val busy: StateFlow<Boolean> = _busy.asStateFlow()
+
+    init {
+        load()
+    }
+
+    private fun load() {
+        viewModelScope.launch {
+            val note = repository.getNote(noteId)
+            val semester = repository.getActiveSemester()
+            val courseName = note?.courseId?.let { courseId ->
+                semester?.let { s -> repository.getCourses(s.id).firstOrNull { it.id == courseId }?.name }
+            }
+            _state.value = NoteDetailUiState(
+                loading = false,
+                note = note,
+                courseName = courseName,
+                summary = repository.getNoteSummary(noteId),
+                segments = repository.getNoteSegments(noteId),
+                photos = repository.getNotePhotos(noteId),
+            )
+        }
+    }
+
+    // ---- 拍照 ----
+
+    /**
+     * 课后给这条笔记补拍一张板书 / 实验数据。
+     *
+     * 这类照片**不挂时间轴**（[NotePhoto.offsetMs] 为 null，界面上标「课后」）：
+     * 录音早就结束了，硬算一个相对偏移会得到一个「74:23:11」这种荒唐的时间戳。
+     */
+    fun beginPhoto(): File? {
+        val note = _state.value.note ?: return null
+        val file = runCatching { photoStore.newPhotoFile(note.id, System.currentTimeMillis()) }
+            .getOrNull()
+        if (file == null) {
+            _message.value = "找不到可写的目录，这张没拍成"
+            return null
+        }
+        pendingPhoto = file
+        return file
+    }
+
+    fun onPhotoResult(success: Boolean) {
+        val file = pendingPhoto ?: return
+        pendingPhoto = null
+        if (!success) {
+            runCatching { file.delete() }
+            return
+        }
+        viewModelScope.launch {
+            if (!file.isFile || file.length() == 0L) {
+                _message.value = "照片没保存成功，再试一次"
+                return@launch
+            }
+            val note = repository.getNote(noteId)
+            if (note == null) {
+                runCatching { file.delete() }
+                _message.value = "这条笔记已经不在了"
+                return@launch
+            }
+            val (width, height) = photoStore.readSize(file)
+            repository.addNotePhoto(
+                NotePhoto(
+                    noteId = note.id,
+                    semesterId = note.semesterId,
+                    courseId = note.courseId,
+                    offsetMs = null,
+                    takenAtMs = file.lastModified().takeIf { it > 0 } ?: System.currentTimeMillis(),
+                    path = file.absolutePath,
+                    width = width,
+                    height = height,
+                    sizeBytes = file.length(),
+                    createdAt = System.currentTimeMillis(),
+                ),
+            )
+            _message.value = "已加入这条笔记"
+            load()
+        }
+    }
+
+    /** 删一张照片（连同文件）。 */
+    fun deletePhoto(photoId: Long) {
+        viewModelScope.launch {
+            val ok = repository.deleteNotePhoto(photoId)
+            _message.value = if (ok) "已删除这张照片" else "照片已经不在了"
+            load()
+        }
+    }
+
+    /** 重新转写（首次转写也走这里）。 */
+    fun transcribe() {
+        if (_busy.value) return
+        _busy.value = true
+        viewModelScope.launch {
+            try {
+                if (!transcriber.isModelReady()) {
+                    val download = transcriber.downloadModel { _, _ -> }
+                    if (download.isFailure) {
+                        _message.value = "语音模型下载失败：${download.exceptionOrNull()?.message ?: "网络不可用"}"
+                        return@launch
+                    }
+                }
+                _message.value = when (val outcome = transcriber.transcribe(noteId)) {
+                    is NoteTranscriber.Outcome.Success -> "转写完成，共 ${outcome.segmentCount} 句"
+                    is NoteTranscriber.Outcome.Failed -> outcome.message
+                }
+                load()
+            } finally {
+                _busy.value = false
+            }
+        }
+    }
+
+    fun consumeMessage() {
+        _message.value = null
+    }
+
+    companion object {
+        const val ARG_NOTE_ID = "noteId"
+    }
+}

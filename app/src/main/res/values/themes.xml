@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      界面主体由 Compose 绘制，这里只需要一个无 ActionBar 的宿主主题。
+      windowBackground 刻意避开纯白 #FFFFFF：MagicOS 护眼/助眠模式会改色温，
+      大面积纯白观感偏差明显，见 docs/07-荣耀200适配清单.md §七。
+    -->
+    <style name="Theme.ShangKeLe" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#FAFAFA</item>
+    </style>
+</resources>

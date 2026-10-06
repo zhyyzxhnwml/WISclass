@@ -1,0 +1,6 @@
+{
+    "version":  "0.10.1-w6",
+    "notes":  "0.10.1-w6：修好周次(开学日为锚，8/29开学→第1周 08-29~09-04)；课上完之后整条不再显示；底部导航菜单；拍板书挂到录音时间轴；新增自动更新。",
+    "apkUrl":  "https://raw.githubusercontent.com/zhyyzxhnwml/WISclass/main/release/ShangKeLe-0.10.1-w6-release.apk",
+    "sizeBytes":  43710712
+}

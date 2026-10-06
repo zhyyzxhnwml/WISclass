@@ -1,0 +1,35 @@
+# 学校相关配置 —— 构建时注入，**不进仓库**。
+#
+# 仓库是公开的，所以「哪所学校」这件事必须只存在于本机。
+# 用法：把本文件复制成 school.properties（已被 .gitignore 忽略），填上你自己的值。
+#
+#     Copy-Item school.properties.example school.properties
+#
+# 不填也能构建：会得到一套「连不上任何真实教务系统」的占位值，
+# 课表、录音、笔记、拍照、自动更新全都能正常跑，只有教务导入用不了。
+#
+# ─────────────────────────────────────────────────────────
+# 学校名称。只用于界面文案（如「从 XX 教务系统导入」）。留空则显示「学校」。
+school.name=
+
+# 教务系统根地址的 host（不含 http://）。正方 V9 多数部署是 http。
+# 例：jwgl.example.edu.cn
+school.jwgl.host=
+
+# 统一身份认证的 host。走 WebView 时由官方页面自己跳转，这里只做记录。
+# 例：authserver.example.edu.cn
+school.cas.host=
+
+# 校园根域名。用于判断「这个链接还在不在学校里」——
+# 带着教务会话的 WebView 不该满世界跑，站外链接一律丢给系统浏览器。
+# 例：example.edu.cn
+school.domain.suffix=
+
+# 允许明文 http 的域名（逗号分隔）。教务系统若是 http，必须在这里放行，
+# 否则 Android 会直接掐断请求。
+# 例：example.edu.cn,jwgl.example.edu.cn
+school.cleartext.domains=
+
+# 只用于本地测试自动更新的局域网地址（逗号分隔，可留空）。
+# 见 tools/release/serve.ps1
+school.cleartext.lanIps=192.168.0.3

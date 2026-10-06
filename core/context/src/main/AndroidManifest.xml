@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 自动勿扰：需要勿扰访问权（用户手动授予，无法运行时申请） -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+
+    <!-- 课堂录音（运行时申请） -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+
+    <!-- 精准到分钟的上课/下课切换；MagicOS 上可能默认关闭，需引导授权 -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <application>
+
+        <!--
+          exported=true 是给 BOOT_COMPLETED 用的（系统广播来自应用外部）。
+          它能做的事只有「按课表重算一次勿扰状态」，被外部触发也无害。
+          我们自己的闹钟用显式 PendingIntent 指向它，不受 exported 影响。
+        -->
+        <receiver
+            android:name=".silence.ClassSilenceReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!--
+          课堂录音前台服务。Android 14+ 要求显式声明 foregroundServiceType，
+          且启动时必须已有 RECORD_AUDIO 运行时权限。
+        -->
+        <service
+            android:name=".recording.RecordingService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
+    </application>
+
+</manifest>

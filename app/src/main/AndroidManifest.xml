@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 教务系统抓取（W2 使用） -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- 课程提醒、导入进度通知（Android 13+ 需要运行时申请） -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!--
+      自动更新要能把下载好的 APK 交给系统安装器。
+      Android 8 起这个权限**不能靠运行时申请**拿到，必须由用户在系统里打开
+      「安装未知应用 → 上课啦」；代码只能把他带到那个页面（见 ApkInstaller）。
+    -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!--
+      拍照走系统相机（ActivityResultContracts.TakePicture），所以：
+
+      1. **刻意不声明 android.permission.CAMERA。** 一旦本应用声明了它，
+         ACTION_IMAGE_CAPTURE 就会反过来要求我们自己去申请该权限；
+         不声明则由相机应用自己负责，我们一个权限都不用要。
+      2. required=false —— 没有摄像头的设备也应该能装（拍照只是附加功能，
+         课表、录音、转写都不依赖它）。
+
+      照片写在应用自己的外部私有目录（Pictures/photos/），不碰 MediaStore，
+      因此也不需要任何存储/媒体权限。相机应用要往里写，靠下面的 FileProvider 授权。
+    -->
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
+    <application
+        android:name=".ShangKeLeApp"
+        android:allowBackup="true"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.ShangKeLe">
+
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode|density|fontScale"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.ShangKeLe"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          exported=true 是给桌面（另一个应用）投递 APPWIDGET_UPDATE 用的。
+          它唯一能做的事就是按当前课表重画一次小组件，被外部触发也无害。
+        -->
+        <receiver
+            android:name=".widget.TodayScheduleWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/today_schedule_widget_info" />
+        </receiver>
+
+        <!--
+          把「应用私有目录里的某个照片文件」临时授权给相机应用去写。
+          exported=false + grantUriPermissions=true：外部应用只能拿到我们逐次
+          授出去的那一个 Uri，不能自己遍历我们的目录。
+          路径白名单在 res/xml/file_paths.xml，authority 必须与
+          NotePhotoStore.authority() 一致。
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+    </application>
+
+</manifest>

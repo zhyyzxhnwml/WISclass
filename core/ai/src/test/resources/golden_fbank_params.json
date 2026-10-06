@@ -1,0 +1,20 @@
+{
+  "samp_freq": 16000,
+  "frame_length_ms": 25,
+  "frame_shift_ms": 10,
+  "frame_length_samples": 400,
+  "frame_shift_samples": 160,
+  "padded_length": 512,
+  "num_mel_bins": 80,
+  "window_len": 400,
+  "mel_matrix_shape": [
+    80,
+    257
+  ],
+  "rfft_pack": "kaldi: raw[0]=DC.real, raw[1]=Nyquist.real, raw[2k],raw[2k+1]=bin k \u7684 re/im (k=1..N/2-1)",
+  "preemph_first_sample_self": true,
+  "preemph_before_dc_removal": false,
+  "mel_matrix_cols": 257,
+  "log_floor": 1.1920929e-07,
+  "verified_max_abs_err": 7.944450566910177e-05
+}

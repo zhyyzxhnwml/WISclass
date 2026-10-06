@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">上课啦</string>
+    <string name="widget_label">今日课表</string>
+    <string name="widget_description">显示今天要上的课，并标出下一节</string>
+</resources>
