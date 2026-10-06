@@ -130,8 +130,15 @@ class UpdateViewModel @Inject constructor(
             _state.value = UpdateUiState.NeedInstallPermission(apk)
             return
         }
-        if (!installer.install(apk)) {
-            _state.value = UpdateUiState.Failed("调不起系统安装器，可能是文件已损坏")
+        viewModelScope.launch {
+            // 会话方式要把 40 多 MB 完整复制进系统目录，不能在主线程上做
+            if (installer.install(apk)) {
+                // 已经交给系统了，把弹窗收起来 —— 系统紧接着会弹它自己的确认界面。
+                // 用户在那里面取消的话，重新检查更新即可：下载好的包会被复用，不用重下。
+                _state.value = UpdateUiState.Idle
+            } else {
+                _state.value = UpdateUiState.Failed("没能交给系统安装器，可能是下载的文件损坏了")
+            }
         }
     }
 

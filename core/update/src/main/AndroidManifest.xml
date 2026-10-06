@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+
+        <!--
+          收安装结果的一层透明页面，见 InstallResultActivity 的说明。
+
+          exported=false：只由系统通过我们自己申请的 PendingIntent 拉起。
+          excludeFromRecents：它没有界面，不该在最近任务里占一格。
+        -->
+        <activity
+            android:name=".InstallResultActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+    </application>
+
+</manifest>
