@@ -17,6 +17,8 @@ data class NextCourseHint(
     val timeLabel: String,
     val minutesUntilStart: Long,
     val ongoing: Boolean,
+    /** 归一化后的教室键（`A-101`）。「我到教室了」要按它存坐标。 */
+    val roomKey: String? = null,
 )
 
 data class ScheduleUiState(
@@ -34,6 +36,12 @@ data class ScheduleUiState(
     val nextCourse: NextCourseHint? = null,
     /** 「该出发了」建议：下一节课该几点出门、为什么 */
     val departure: DepartureAdvice? = null,
+    /** 这节课的教室坐标是否已经记过。没记过就在卡片上给「我到教室了」 */
+    val classroomLocationKnown: Boolean = false,
+    /** 正在取定位 */
+    val capturingLocation: Boolean = false,
+    /** 「我到教室了」的结果提示（成功，或失败原因），显示在卡片里 */
+    val captureMessage: String? = null,
     val unreadChangeCount: Int = 0,
     /**
      * 校历是否已被用户确认过。

@@ -1,11 +1,14 @@
 package com.shangkele.core.database.repository
 
+import com.shangkele.core.common.classroom.RoomKeyNormalizer
 import com.shangkele.core.database.dao.AssignmentDao
+import com.shangkele.core.database.dao.CampusPoiDao
 import com.shangkele.core.database.dao.ChangeLogDao
 import com.shangkele.core.database.dao.CourseDao
 import com.shangkele.core.database.dao.NoteDao
 import com.shangkele.core.database.dao.SemesterDao
 import com.shangkele.core.database.dao.TimeSlotDao
+import com.shangkele.core.database.entity.CampusPoiEntity
 import com.shangkele.core.database.entity.ChangeLogEntity
 import com.shangkele.core.database.entity.NoteEntity
 import com.shangkele.core.database.entity.SemesterEntity
@@ -13,6 +16,7 @@ import com.shangkele.core.database.mapper.toDomain
 import com.shangkele.core.database.mapper.toEntity
 import com.shangkele.core.model.Assignment
 import com.shangkele.core.model.Course
+import com.shangkele.core.model.GeoPoint
 import com.shangkele.core.model.Note
 import com.shangkele.core.model.NotePhoto
 import com.shangkele.core.model.NoteStatus
@@ -42,6 +46,7 @@ class ScheduleRepository @Inject constructor(
     private val changeLogDao: ChangeLogDao,
     private val noteDao: NoteDao,
     private val assignmentDao: AssignmentDao,
+    private val campusPoiDao: CampusPoiDao,
 ) {
 
     fun observeActiveSemester(): Flow<Semester?> =
@@ -349,6 +354,63 @@ class ScheduleRepository @Inject constructor(
     suspend fun setAssignmentDone(id: Long, done: Boolean) = assignmentDao.setDone(id, done)
 
     suspend fun deleteAssignment(id: Long) = assignmentDao.delete(id)
+
+    // ---- 教室坐标 ----
+
+    /**
+     * 已经采到坐标的教室：roomKey → 坐标。
+     *
+     * 只返回两个坐标都有值的行；顺手再滤掉 `(0, 0)` —— 那是定位失败时的典型返回值，
+     * 当成真坐标会算出「你在几内亚湾」，提前量荒唐到提醒直接失效。
+     */
+    suspend fun getClassroomLocations(): Map<String, GeoPoint> =
+        campusPoiDao.getLocated().mapNotNull { poi ->
+            val lat = poi.lat ?: return@mapNotNull null
+            val lng = poi.lng ?: return@mapNotNull null
+            val point = GeoPoint(lat, lng)
+            if (point.isValid) poi.roomKey to point else null
+        }.toMap()
+
+    /** 教室坐标的变化流。界面据此判断「这间教室记过位置没有」。 */
+    fun observeClassroomLocations(): Flow<Map<String, GeoPoint>> =
+        campusPoiDao.observeAll().map { list ->
+            list.mapNotNull { poi ->
+                val lat = poi.lat ?: return@mapNotNull null
+                val lng = poi.lng ?: return@mapNotNull null
+                val point = GeoPoint(lat, lng)
+                if (point.isValid) poi.roomKey to point else null
+            }.toMap()
+        }
+
+    /**
+     * 记下某个教室的坐标 —— 用户站在教室里按「我到教室了」时调用。
+     *
+     * 键用**归一化后的 roomKey**（`A-101`）而不是教室名原文：`A101` 与 `A-101`
+     * 是同一间教室，不归一化的话同一间会被记成好几条，而且永远学不全。
+     */
+    suspend fun rememberClassroomLocation(roomKey: String, point: GeoPoint): Boolean {
+        if (roomKey.isBlank() || !point.isValid) return false
+
+        return if (campusPoiDao.getByRoomKey(roomKey) != null) {
+            campusPoiDao.updateLocation(roomKey, point.lat, point.lng)
+            true
+        } else {
+            campusPoiDao.insert(
+                CampusPoiEntity(
+                    roomKey = roomKey,
+                    building = RoomKeyNormalizer.buildingOf(roomKey),
+                    floor = RoomKeyNormalizer.floorOf(roomKey),
+                    roomNo = RoomKeyNormalizer.roomNumberOf(roomKey),
+                    lat = point.lat,
+                    lng = point.lng,
+                    walkMinutesFromGate = null,
+                    walkMinutesFromDorm = null,
+                    note = null,
+                ),
+            )
+            true
+        }
+    }
 
     /** 删一张照片：先删库再删文件，理由同 [deleteNote]。 */
     suspend fun deleteNotePhoto(photoId: Long): Boolean {

@@ -18,6 +18,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -29,6 +30,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,6 +46,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.shangkele.core.context.departure.DepartureAdvice
@@ -79,6 +86,27 @@ fun ScheduleScreen(
             viewModel.selectWeek(page + 1)
         }
     }
+
+    // 「我到教室了」：没权限就先申请，授予后自动继续。
+    // 只申请**粗略定位** —— 判断在不在教学楼附近不需要米级精度，
+    // 而粗略定位对用户打扰更小（系统允许他只给大概位置）。
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted -> if (granted) viewModel.rememberClassroomLocation() }
+
+    val context = LocalContext.current
+    val rememberClassroom: () -> Unit = {
+        val granted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (granted) viewModel.rememberClassroomLocation()
+        else locationPermissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+    }
+
+    // 进页面时顺手取一次位置：只为让课表上的出发建议也走距离口径。
+    // 取不到就算了，这条是锦上添花，不打扰用户。
+    LaunchedEffect(Unit) { viewModel.refreshLocation() }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -147,6 +175,7 @@ fun ScheduleScreen(
                     onOpenCalendar = onOpenCalendar,
                     onCourseClick = viewModel::toggleCourse,
                     onDismissDetail = viewModel::clearSelectedCourse,
+                    onRememberClassroom = rememberClassroom,
                 )
             }
         }
@@ -228,6 +257,7 @@ private fun ScheduleContent(
     onOpenCalendar: () -> Unit,
     onCourseClick: (Course) -> Unit,
     onDismissDetail: () -> Unit,
+    onRememberClassroom: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         // 校历没确认过就挂一条提示。不猜日期，但也不能装作没事 ——
@@ -237,7 +267,14 @@ private fun ScheduleContent(
         }
 
         state.nextCourse?.let { hint ->
-            NextCourseCard(hint = hint, departure = state.departure)
+            NextCourseCard(
+                hint = hint,
+                departure = state.departure,
+                classroomLocationKnown = state.classroomLocationKnown,
+                capturing = state.capturingLocation,
+                captureMessage = state.captureMessage,
+                onRememberClassroom = onRememberClassroom,
+            )
         }
 
         WeekHeader(
@@ -295,7 +332,14 @@ private fun ScheduleContent(
 }
 
 @Composable
-private fun NextCourseCard(hint: NextCourseHint, departure: DepartureAdvice?) {
+private fun NextCourseCard(
+    hint: NextCourseHint,
+    departure: DepartureAdvice?,
+    classroomLocationKnown: Boolean,
+    capturing: Boolean,
+    captureMessage: String?,
+    onRememberClassroom: () -> Unit,
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -335,6 +379,40 @@ private fun NextCourseCard(hint: NextCourseHint, departure: DepartureAdvice?) {
                         text = departureLine(hint, advice),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+
+                // 教室坐标唯一的来源：人到了教室按一下。
+                // 已经记过位置的教室就不再问 —— 每次都问会变成噪音。
+                if (!classroomLocationKnown) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = if (hint.ongoing) {
+                            "就在这间教室？点一下记住它的位置，以后出发提醒能按距离算。"
+                        } else {
+                            "到教室后点一下，记住这间教室的位置。"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                    TextButton(
+                        onClick = onRememberClassroom,
+                        enabled = !capturing,
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        ),
+                    ) {
+                        Text(if (capturing) "定位中…" else "我到教室了")
+                    }
+                }
+
+                // 失败原因必须说出来：点了没反应，用户只会以为功能坏了
+                captureMessage?.let { message ->
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                 }

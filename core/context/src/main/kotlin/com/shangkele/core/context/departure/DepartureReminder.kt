@@ -12,6 +12,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.shangkele.core.context.R
+import com.shangkele.core.context.location.DeviceLocation
 import com.shangkele.core.context.prefs.AppPreferences
 import com.shangkele.core.context.silence.ClassSilenceReceiver
 import com.shangkele.core.database.repository.ScheduleRepository
@@ -101,6 +102,7 @@ class DepartureReminderScheduler @Inject constructor(
     private val repository: ScheduleRepository,
     private val notifier: DepartureNotifier,
     private val prefs: AppPreferences,
+    private val location: DeviceLocation,
 ) {
 
     suspend fun reschedule(nowMillis: Long = System.currentTimeMillis()): DeparturePlan? {
@@ -123,7 +125,18 @@ class DepartureReminderScheduler @Inject constructor(
         val weekday = WeekCalculator.weekdayOf(todayEpochDay)
         val coursesToday = courses.filter { it.weekday == weekday && it.occursInWeek(week) }
 
-        val plan = DeparturePlanner.plan(coursesToday, slots, nowMillis)
+        // 教室坐标一间都没采过时**根本不去定位**：用不上，白唤醒 GPS 只会耗电，
+        // 还会让状态栏闪一下定位图标（用户会问「它怎么在定位」）
+        val roomLocations = repository.getClassroomLocations()
+        val current = if (roomLocations.isEmpty()) null else location.current(REMINDER_LOCATION_TIMEOUT_MS)
+
+        val plan = DeparturePlanner.plan(
+            coursesToday = coursesToday,
+            slots = slots,
+            nowMillis = nowMillis,
+            current = current,
+            roomLocations = roomLocations,
+        )
         if (plan.shouldNotifyNow) {
             plan.advice?.let { notifier.notifyDeparture(it) }
         }
@@ -165,5 +178,18 @@ class DepartureReminderScheduler @Inject constructor(
 
     private companion object {
         const val REQUEST_CODE = 0x534B02
+
+        /**
+         * 提醒这条路径上最多等定位多久。
+         *
+         * 它可能跑在广播接收器的 `goAsync()` 里（系统给的时间很紧），所以比
+         * 交互式采集短得多 —— 等不到就退回楼栋推断，不能把接收器拖到超时。
+         *
+         * 还要清楚一件事：**Android 10 起应用在后台读定位会被直接拒**（除非另外申请
+         * 「始终允许」）。闹钟响的时候 App 基本都在后台，所以那条路大概率拿不到位置、
+         * 走回退逻辑。这是系统限制，不是这里写错了 —— 后果是「按距离提醒」
+         * 主要在 App 处于前台时生效，采集坐标（前台交互）不受影响。
+         */
+        const val REMINDER_LOCATION_TIMEOUT_MS = 4_000L
     }
 }
