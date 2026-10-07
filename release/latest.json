@@ -1,6 +1,6 @@
 {
-    "version":  "0.10.6-w6",
-    "notes":  "0.10.6-w6：修好「更新第一次一定卡在正在安装」。改用系统的安装会话，它会先把安装包复制到自己那边再装 —— 以前是让系统去读我们进程里的文件，而系统要装的正是这个包，它得先杀掉我们，一杀文件就没了，所以第一次必卡。现在失败也会把系统给的原因说出来，不再无声无息。",
-    "apkUrl":  "https://raw.githubusercontent.com/zhyyzxhnwml/WISclass/main/release/ShangKeLe-0.10.6-w6-release.apk",
+    "version":  "0.10.7-w6",
+    "notes":  "0.10.7-w6：更新源换成 Gitee（GitHub 国内经常连不上，连不上就等于更新不了）。GitHub 那份清单保留为备用，主源读不到时会自动再试一次。这一版之后，检查更新会走 Gitee。",
+    "apkUrl":  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.7-w6-release.apk",
     "sizeBytes":  43792860
 }
