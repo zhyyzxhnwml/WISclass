@@ -20,13 +20,21 @@
   生成：GitHub → Settings → Developer settings → Fine-grained token
         → Repository permissions → Contents: Read and write
 
+  仓库名读 tools/release/repo.txt；托管商默认 Gitee。
+
   用法：
       pwsh tools/release/publish.ps1 -Notes "这次改了什么"
+      pwsh tools/release/publish.ps1 -Host github -Notes "..."   # 改发到 GitHub
       pwsh tools/release/publish.ps1 -ForceGit          # 有 token 也走 git
       pwsh tools/release/publish.ps1 -DryRun            # 只打印，不动任何东西
 #>
 param(
     [string]$Repo = "",
+    # 用哪个托管商。两者的 raw 地址格式不一样，拼错了 App 那边就是 404，
+    # 而报出来的错还是「更新源返回 404：仓库名或路径不对」：
+    #   Gitee   https://gitee.com/{owner}/{repo}/raw/{branch}/{path}
+    #   GitHub  https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}
+    [ValidateSet('gitee', 'github')][string]$Host = 'gitee',
     [string]$Notes = "",
     [switch]$ForceGit,
     [switch]$DryRun
@@ -75,7 +83,11 @@ if (-not $Repo -or $Repo -notmatch '/') {
     Fail "没找到仓库名。请在 tools/release/repo.txt 里写一行 owner/name"
 }
 $branch = 'main'
-$rawBase = "https://raw.githubusercontent.com/$Repo/$branch/release"
+$rawBase = if ($Host -eq 'gitee') {
+    "https://gitee.com/$Repo/raw/$branch/release"
+} else {
+    "https://raw.githubusercontent.com/$Repo/$branch/release"
+}
 
 # ── 2. Token（可选）────────────────────────────────────────
 $token = $env:GITHUB_TOKEN
@@ -83,7 +95,8 @@ if (-not $token) {
     $tokenFile = Join-Path $toolDir 'github-token.txt'
     if (Test-Path $tokenFile) { $token = (Get-Content $tokenFile -Encoding UTF8 | Select-Object -First 1).Trim() }
 }
-$mode = if ($token -and -not $ForceGit) { 'Release' } else { 'Git' }
+# Gitee 没有等价于 GitHub Release 附件的那套接口（要用得另配令牌），一律走 git
+$mode = if ($Host -eq 'gitee') { 'Git' } elseif ($token -and -not $ForceGit) { 'Release' } else { 'Git' }
 
 # ── 3. 版本与产物 ──────────────────────────────────────────
 $gradle = Get-Content (Join-Path $root 'app\build.gradle.kts') -Encoding UTF8
@@ -190,8 +203,21 @@ if (-not $staged) {
 } else {
     $staged | ForEach-Object { Info "  $_" }
     if ((Invoke-Git commit -q -m "release: $version") -ne 0) { Fail "提交失败" }
-    if ((Invoke-Git push origin $branch) -ne 0) {
-        Fail "推送失败。先在项目根目录手动跑一次 git push，确认凭据可用"
+
+    # 推给**所有配了的远端**：Gitee 是新的主更新源，GitHub 也留着 ——
+    # 已经装出去的版本读的是 GitHub 那份清单，不推它就等于把老用户留在旧版本上。
+    $targets = @()
+    foreach ($name in @('gitee', 'origin', 'github')) {
+        if (Invoke-GitCapture remote get-url $name) { $targets += $name }
+    }
+    foreach ($name in ($targets | Select-Object -Unique)) {
+        if ((Invoke-Git push $name $branch) -eq 0) {
+            Info "  已推送 $name"
+        } else {
+            # 不让一个远端的网络问题废掉整次发布：本地已经提交好了，
+            # 换个时间手动补一次 git push 即可
+            Write-Host "  推送 $name 失败（多半是网络）。本地已提交，稍后手动跑：git push $name $branch" -ForegroundColor Yellow
+        }
     }
 }
 

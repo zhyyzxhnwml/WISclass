@@ -37,21 +37,51 @@ class UpdateChecker @Inject constructor(
         .readTimeout(20, TimeUnit.SECONDS)
         .build()
 
+    /**
+     * 检查有没有新版本。
+     *
+     * 主源失败时会再试一次[备用源][UpdateSource.FALLBACK_MANIFEST_URL]：
+     * 「更新源连不上」在用户眼里就是「这 App 再也更新不了」，而两个不同域
+     * 同时挂掉的概率很低。全都失败才报错，并且把两边的原因都列出来 ——
+     * 只说「检查失败」的话，用户没法判断是自己网络的问题还是源的问题。
+     */
     suspend fun check(currentVersion: String, url: String = source.manifestUrl): CheckResult {
         if (url.isBlank()) {
             return CheckResult.Failed("还没配置更新源，去「设置 → 检查更新」填一个地址")
         }
-        return try {
-            val raw = fetch(withCacheBuster(url))
-            val manifest = UpdateManifestParser.parse(raw)
-            if (VersionCompare.isNewer(manifest.version, currentVersion)) {
-                CheckResult.Available(manifest)
-            } else {
-                CheckResult.UpToDate(currentVersion)
+
+        val candidates = listOf(url, UpdateSource.FALLBACK_MANIFEST_URL)
+            .filter { it.isNotBlank() }
+            .distinct()
+
+        val failures = mutableListOf<String>()
+        for (candidate in candidates) {
+            when (val result = checkOne(candidate, currentVersion)) {
+                // 主源答得出结果就以它为准，不去拿备用源比版本
+                is CheckResult.Failed -> failures += result.message
+                else -> return result
             }
-        } catch (e: Exception) {
-            CheckResult.Failed(describe(e))
         }
+
+        return CheckResult.Failed(
+            if (failures.size <= 1) {
+                failures.firstOrNull() ?: "检查更新失败"
+            } else {
+                "两个更新源都没连上：\n· ${failures[0]}\n· ${failures[1]}"
+            },
+        )
+    }
+
+    private suspend fun checkOne(url: String, currentVersion: String): CheckResult = try {
+        val raw = fetch(withCacheBuster(url))
+        val manifest = UpdateManifestParser.parse(raw)
+        if (VersionCompare.isNewer(manifest.version, currentVersion)) {
+            CheckResult.Available(manifest)
+        } else {
+            CheckResult.UpToDate(currentVersion)
+        }
+    } catch (e: Exception) {
+        CheckResult.Failed(describe(e))
     }
 
     private suspend fun fetch(url: String): String = withContext(Dispatchers.IO) {
@@ -81,16 +111,17 @@ class UpdateChecker @Inject constructor(
     }
 
     /**
-     * 给 raw.githubusercontent.com 的地址加一个时间戳，绕开 CDN 缓存。
+     * 给静态分发地址加一个时间戳，**尽量**绕开 CDN 缓存。
      *
-     * raw 走 CDN，同一个文件大概会缓存几分钟。刚发完版就在手机上检查，
-     * 会读到旧清单，表现是「作者说发了新版，但 App 说已是最新」——
-     * 这种误会最后一定会被当成 bug 来找。
+     * 得说清楚：这条**并不可靠**。本机实测 raw.githubusercontent.com 带随机参数
+     * 依然返回 `X-Cache: HIT`，也就是参数没进缓存键 —— 所以「刚发完版手机上读到旧清单」
+     * 这件事仍会发生，真正管用的办法是发完版等几分钟再检查（见 tools/release/README.md）。
+     * 留着它是「有总比没有强」，而且对别的静态托管可能是有效的。
      *
-     * 只对 raw 加：GitHub API 本身不缓存内容，加参数反而没意义。
+     * 不处理 API 域名：那类接口本身不缓存内容，加参数没意义。
      */
     private fun withCacheBuster(url: String): String {
-        if (!url.contains("raw.githubusercontent.com")) return url
+        if (url.contains("api.github.com") || url.contains("gitee.com/api")) return url
         val separator = if (url.contains('?')) '&' else '?'
         return "$url$separator" + "t=" + (System.currentTimeMillis() / 1000)
     }

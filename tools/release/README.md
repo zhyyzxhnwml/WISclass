@@ -1,25 +1,50 @@
 # 发版与自动更新
 
-仓库：`zhyyzxhnwml/WISclass`
+仓库：`wis314/wisclass`（Gitee）
 
-App 开启动时会静默查一次更新（6 小时一次），设置页有手动入口。
+App 启动时会静默查一次更新（6 小时一次），设置页有手动入口。
 查到新版本弹窗显示更新说明 → 下载 → 跳系统安装界面。
 
 ## 数据流
 
 ```
-App 读 →  https://raw.githubusercontent.com/zhyyzxhnwml/WISclass/main/release/latest.json
+App 读 →  https://gitee.com/wis314/wisclass/raw/main/release/latest.json    ← 主源
+              │   （读不到时自动再试 GitHub 上同一份清单）
               │
-              └─ apkUrl 指向两个地方之一：
-                   Release 附件   （推荐：APK 不进 git，仓库不会变胖）
-                   仓库里的 APK   （零配置：不需要 token，但每版胖 ~42MB）
+              └─ apkUrl：仓库里的 APK
+                   https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-<版本>-release.apk
 ```
 
-清单地址固定在 raw 上，**所以换发布模式不用改 App**。
+**为什么主源是 Gitee 而不是 GitHub**：GitHub 在国内经常连不上，而更新源连不上，
+在用户眼里就等于「这个 App 再也更新不了」。GitHub 那份清单保留为备用源
+（两个不同域同时挂掉的概率很低）：
 
-**为什么清单不走 `api.github.com`**：那个接口的匿名配额按 **IP** 算（每小时 60 次），
-共享出口很容易被用光 —— 本机实测就撞上过 `0/60`，一律 403。
-`raw.githubusercontent.com` 是 CDN，读公开仓库的小文件既不限额也不要 token。
+- 主源 `https://gitee.com/wis314/wisclass/raw/main/release/latest.json`
+- 备用 `https://raw.githubusercontent.com/zhyyzxhnwml/WISclass/main/release/latest.json`
+
+两个平台的 raw 地址**格式不同**，拼错就是 404，而报出来的错还是
+「仓库名或路径不对」——所以 `publish.ps1` 用 `-Host` 显式区分，不靠猜：
+
+```
+Gitee   https://gitee.com/{owner}/{repo}/raw/{branch}/{path}
+GitHub  https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}
+```
+
+**为什么都不用「Release API」**：那类接口要么按 IP 算匿名配额（本机实测撞到过
+`0/60`，一律 403），要么要 token。读一个公开仓库的小文件，raw 最省事。
+
+### 发完版要等几分钟（这条很重要）
+
+raw 走 CDN，响应头是 `Cache-Control: max-age=300`。本机实测：
+
+```
+发完版 +  0s ~ +280s   读到的还是旧清单
+发完版 +320s           变成新清单
+```
+
+App 里那个 `?t=时间戳` 参数**并没能绕开它**（带随机参数照样返回 `X-Cache: HIT`，
+说明参数没进缓存键）。所以别指望它 —— **刚发完版就去手机上点检查更新，会看到
+「已是最新版」**，然后被当成 bug 来找（已经发生过一次）。等 5 分钟再查。
 
 （清单请求会自动带一个时间戳绕开 CDN 缓存，否则刚发完版手机上会读到旧清单。）
 
@@ -32,18 +57,23 @@ App 读 →  https://raw.githubusercontent.com/zhyyzxhnwml/WISclass/main/release
 # 3. 把产物按版本号命名（现有习惯）
 Copy-Item app\build\outputs\apk\release\app-release.apk `
           dist\ShangKeLe-<版本号>-release.apk
-# 4. 发布
+# 4. 发布（默认发到 Gitee）
 pwsh tools/release/publish.ps1 -Notes "这次改了什么"
 ```
 
-`publish.ps1` 会自己选模式：
+脚本会把 `release/` 提交，然后**推给所有配了的远端**（`gitee` 与 `github`）。
+GitHub 之所以也推，是因为**已经装出去的版本读的还是 GitHub 那份清单** ——
+不推它，等于把老用户留在旧版本上。
+
+`publish.ps1` 自己选模式：
 
 | 模式 | 何时用 | 代价 |
 |---|---|---|
-| **Release** | `tools/release/github-token.txt` 里有 token | 无（除了要建一次 token） |
-| **Git** | 没有 token | 仓库每发一版胖 ~42MB |
+| **Git** | Gitee（默认）；或没有 token 的 GitHub | 仓库每发一版胖 ~42MB |
+| **Release** | GitHub 且有 `tools/release/github-token.txt` | 无（除了要建一次 token） |
 
-两者产出的 `latest.json` 完全一样。
+Gitee 没有等价于 GitHub Release 附件的那套接口，所以那边一律走 Git 模式。
+两者产出的 `latest.json` 结构完全一样，区别只在 `apkUrl` 指向实际托管的那一份。
 
 ### 想要 Release 模式（推荐）
 

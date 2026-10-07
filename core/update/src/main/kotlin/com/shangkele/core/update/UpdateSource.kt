@@ -46,15 +46,26 @@ class UpdateSource @Inject constructor(
         /**
          * 默认更新源：仓库里的 `release/latest.json`。
          *
-         * **为什么不用 `api.github.com/.../releases/latest`**：那个接口的匿名配额是
-         * 按 **IP** 算的（每小时 60 次），共享出口很容易被用光 —— 本机实测就碰上过
-         * `0/60`，一律 403。而 raw.githubusercontent.com 是 CDN，读一个公开仓库的
-         * 小文件既不限额也不要 token。
+         * **为什么是 Gitee 而不是 GitHub**：GitHub 在国内经常连不上，而更新源连不上
+         * 就等于「这个 App 再也更新不了」—— 用户会以为是自己手机的问题。
+         * Gitee 的 raw 是公开直读的，不要 token、不限额。
          *
-         * 清单里的 `apkUrl` 才决定 APK 从哪儿下：Release 附件（推荐，不占 git）
-         * 或仓库里的 APK（零配置，但仓库会变胖）。看 `tools/release/README.md`。
+         * 也不用任何平台的「Release API」：那类接口要么按 IP 算匿名配额
+         * （本机实测撞到过 `0/60`，一律 403），要么需要 token。
+         * 读一个公开仓库的小文件，raw 最省事。
+         *
+         * 清单里的 `apkUrl` 才决定 APK 从哪儿下。看 `tools/release/README.md`。
          */
         const val DEFAULT_MANIFEST_URL: String =
+            "https://gitee.com/wis314/wisclass/raw/main/release/latest.json"
+
+        /**
+         * 备用更新源：GitHub 上同一份清单。
+         *
+         * 只在主源**失败**时才去试（不是用来比版本的）：两个不同域同时不可达的概率
+         * 很低，而「主源抽风一次就完全更新不了」是用户直接能感知到的故障。
+         */
+        const val FALLBACK_MANIFEST_URL: String =
             "https://raw.githubusercontent.com/zhyyzxhnwml/WISclass/main/release/latest.json"
 
         /** 自动检查的最小间隔。开 App 就查一次太浪费配额，也没必要。 */

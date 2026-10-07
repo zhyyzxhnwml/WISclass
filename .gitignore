@@ -25,9 +25,10 @@ keystore/
 keystore.properties
 # 打包产物
 dist/
-# 发布用的本地凭据：仓库名与 GitHub token（绝不入库）
+# 发布用的本地凭据：仓库名与各平台 token（绝不入库）
 tools/release/repo.txt
 tools/release/github-token.txt
+tools/release/gitee-token.txt
 
 # 学校配置：**绝不入库**
 # 仓库是公开的，「哪所学校」这件事只存在于本机。构建时从这里读，注入到 App 里。
