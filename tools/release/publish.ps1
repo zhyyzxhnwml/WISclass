@@ -35,6 +35,9 @@ param(
     #   Gitee   https://gitee.com/{owner}/{repo}/raw/{branch}/{path}
     #   GitHub  https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}
     [ValidateSet('gitee', 'github')][string]$Provider = 'gitee',
+    # Gitee 上每片的大小上限（MB）。实测 Gitee 允许匿名下载 8MB，16MB 就 403，
+    # 所以默认 6MB 留出余量。
+    [int]$PartSizeMB = 6,
     [string]$Notes = "",
     [switch]$ForceGit,
     [switch]$DryRun
@@ -121,8 +124,10 @@ Info "附件    $($apk.Name)  $([math]::Round($apk.Length/1MB,2)) MB"
 
 if ($DryRun) { Info ''; Info '-DryRun：到此为止'; exit 0 }
 
-# ── 4. 按模式拿到 apkUrl ───────────────────────────────────
+# ── 4. 按模式拿到下载地址 ──────────────────────────────────
 $apkUrl = ""
+# Gitee 模式下这里是分片地址；两者最终**只有一个**会写进清单
+$parts = @()
 if ($mode -eq 'Release') {
     Step "上传 Release 附件"
     $headers = @{
@@ -169,13 +174,50 @@ if ($mode -eq 'Release') {
 } else {
     Step "把 APK 放进 release/ 目录"
     New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
-    # 只留最新那个包在工作区，旧包从 git 里删掉（历史里仍然存在，这一点无法避免）
-    Get-ChildItem $releaseDir -Filter '*.apk' -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -ne $apk.Name } |
-        ForEach-Object { Invoke-Git rm -q --ignore-unmatch -- "release/$($_.Name)" | Out-Null }
-    Copy-Item $apk.FullName (Join-Path $releaseDir $apk.Name) -Force
-    $apkUrl = "$rawBase/$($apk.Name)"
-    Info "APK 地址 $apkUrl"
+
+    # 先清掉上一次的产物（整包与分片）：留着只会让仓库白白变胖
+    Get-ChildItem $releaseDir -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like '*.apk' -or $_.Name -like '*.apk.part*' } |
+        ForEach-Object {
+            Invoke-Git rm -q --ignore-unmatch -- "release/$($_.Name)" | Out-Null
+            Remove-Item $_.FullName -Force -ErrorAction SilentlyContinue
+        }
+
+    if ($Provider -eq 'gitee') {
+        # Gitee **禁止匿名下载 8MB 以上的文件**（实测 16MB 就返回
+        # `403 large file require login for access`），所以整包放上去根本没人下得动。
+        # 切成小片，让 App 分片下载后按顺序拼起来。
+        $partSize = [long]$PartSizeMB * 1MB
+        $buffer = New-Object byte[] (1MB)
+        $input = [IO.File]::OpenRead($apk.FullName)
+        try {
+            $index = 1
+            while ($input.Position -lt $input.Length) {
+                $name = "{0}.part{1:D2}" -f $apk.Name, $index
+                $outPath = Join-Path $releaseDir $name
+                $out = [IO.File]::Create($outPath)
+                try {
+                    $remaining = [Math]::Min($partSize, $input.Length - $input.Position)
+                    while ($remaining -gt 0) {
+                        $toRead = [int][Math]::Min([long]$buffer.Length, $remaining)
+                        $read = $input.Read($buffer, 0, $toRead)
+                        if ($read -le 0) { break }
+                        $out.Write($buffer, 0, $read)
+                        $remaining -= $read
+                    }
+                } finally { $out.Close() }
+                $parts += "$rawBase/$name"
+                Info ("  {0}  {1} MB" -f $name, [math]::Round((Get-Item $outPath).Length / 1MB, 2))
+                $index++
+            }
+        } finally { $input.Close() }
+        Info "共 $($parts.Count) 片（每片上限 $PartSizeMB MB）"
+    } else {
+        # 只留最新那个包在工作区，旧包从 git 里删掉（历史里仍然存在，这一点无法避免）
+        Copy-Item $apk.FullName (Join-Path $releaseDir $apk.Name) -Force
+        $apkUrl = "$rawBase/$($apk.Name)"
+        Info "APK 地址 $apkUrl"
+    }
 }
 
 # ── 5. 写 latest.json（App 读的就是这个） ─────────────────
@@ -184,8 +226,15 @@ New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
 $manifest = [ordered]@{
     version   = $version
     notes     = $Notes
-    apkUrl    = $apkUrl
     sizeBytes = $apk.Length
+}
+# 两种下载形态**二选一**：分片（Gitee 只能这么发）或整包（GitHub 等能下大文件的托管）
+if ($parts.Count -gt 0) {
+    $manifest["parts"] = @($parts)
+    Info "清单里写分片：$($parts.Count) 片"
+} else {
+    $manifest["apkUrl"] = $apkUrl
+    Info "清单里写整包地址"
 }
 $json = $manifest | ConvertTo-Json -Depth 4
 $jsonPath = Join-Path $releaseDir 'latest.json'
@@ -224,7 +273,11 @@ if (-not $staged) {
 Step "完成"
 Info "版本    $version"
 Info "清单    $rawBase/latest.json"
-Info "APK     $apkUrl"
+if ($parts.Count -gt 0) {
+    Info "分片    $($parts.Count) 片，首片 $($parts[0])"
+} else {
+    Info "APK     $apkUrl"
+}
 Info ""
 Info "手机开 App 会在「设置 → 检查更新」看到新版本。"
 if ($mode -eq 'Git') {
