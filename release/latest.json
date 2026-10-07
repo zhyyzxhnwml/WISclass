@@ -1,6 +1,6 @@
 {
     "version":  "0.10.7-w6",
     "notes":  "0.10.7-w6：更新源换成 Gitee（GitHub 国内经常连不上，连不上就等于更新不了）。GitHub 那份清单保留为备用，主源读不到时会自动再试一次。这一版之后，检查更新会走 Gitee。",
-    "apkUrl":  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.7-w6-release.apk",
+    "apkUrl":  "https://raw.githubusercontent.com/zhyyzxhnwml/WISclass/main/release/ShangKeLe-0.10.7-w6-release.apk",
     "sizeBytes":  43792860
 }

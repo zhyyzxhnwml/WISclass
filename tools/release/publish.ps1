@@ -24,7 +24,7 @@
 
   用法：
       pwsh tools/release/publish.ps1 -Notes "这次改了什么"
-      pwsh tools/release/publish.ps1 -Host github -Notes "..."   # 改发到 GitHub
+      pwsh tools/release/publish.ps1 -Provider github -Notes "..."  # 改发到 GitHub
       pwsh tools/release/publish.ps1 -ForceGit          # 有 token 也走 git
       pwsh tools/release/publish.ps1 -DryRun            # 只打印，不动任何东西
 #>
@@ -34,7 +34,7 @@ param(
     # 而报出来的错还是「更新源返回 404：仓库名或路径不对」：
     #   Gitee   https://gitee.com/{owner}/{repo}/raw/{branch}/{path}
     #   GitHub  https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}
-    [ValidateSet('gitee', 'github')][string]$Host = 'gitee',
+    [ValidateSet('gitee', 'github')][string]$Provider = 'gitee',
     [string]$Notes = "",
     [switch]$ForceGit,
     [switch]$DryRun
@@ -83,7 +83,7 @@ if (-not $Repo -or $Repo -notmatch '/') {
     Fail "没找到仓库名。请在 tools/release/repo.txt 里写一行 owner/name"
 }
 $branch = 'main'
-$rawBase = if ($Host -eq 'gitee') {
+$rawBase = if ($Provider -eq 'gitee') {
     "https://gitee.com/$Repo/raw/$branch/release"
 } else {
     "https://raw.githubusercontent.com/$Repo/$branch/release"
@@ -96,7 +96,7 @@ if (-not $token) {
     if (Test-Path $tokenFile) { $token = (Get-Content $tokenFile -Encoding UTF8 | Select-Object -First 1).Trim() }
 }
 # Gitee 没有等价于 GitHub Release 附件的那套接口（要用得另配令牌），一律走 git
-$mode = if ($Host -eq 'gitee') { 'Git' } elseif ($token -and -not $ForceGit) { 'Release' } else { 'Git' }
+$mode = if ($Provider -eq 'gitee') { 'Git' } elseif ($token -and -not $ForceGit) { 'Release' } else { 'Git' }
 
 # ── 3. 版本与产物 ──────────────────────────────────────────
 $gradle = Get-Content (Join-Path $root 'app\build.gradle.kts') -Encoding UTF8
