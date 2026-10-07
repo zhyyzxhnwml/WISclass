@@ -1,6 +1,14 @@
 {
-    "version":  "0.10.7-w6",
-    "notes":  "0.10.7-w6：更新源换成 Gitee（GitHub 国内经常连不上，连不上就等于更新不了）。GitHub 那份清单保留为备用，主源读不到时会自动再试一次。这一版之后，检查更新会走 Gitee。",
-    "apkUrl":  "https://raw.githubusercontent.com/zhyyzxhnwml/WISclass/main/release/ShangKeLe-0.10.7-w6-release.apk",
-    "sizeBytes":  43792860
+    "version":  "0.10.8-w6",
+    "notes":  "0.10.8-w6：Gitee 不允许匿名下载 8MB 以上的文件（实测 16MB 就 403），所以安装包改成切成小片存放，App 分片下载后自动拼起来。这一版之后，更新彻底不依赖 GitHub —— 别人也能正常收到更新。本版需要手动装一次（旧版本不认分片）。",
+    "sizeBytes":  43792860,
+    "parts":  [
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.8-w6-release.apk.part01",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.8-w6-release.apk.part02",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.8-w6-release.apk.part03",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.8-w6-release.apk.part04",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.8-w6-release.apk.part05",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.8-w6-release.apk.part06",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.8-w6-release.apk.part07"
+              ]
 }
