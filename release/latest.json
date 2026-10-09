@@ -1,15 +1,14 @@
 {
-    "version":  "0.10.8-w6",
-    "notes":  "0.10.8-w6：Gitee 不允许匿名下载 8MB 以上的文件（实测 16MB 就 403），所以安装包改成切成小片存放，App 分片下载后自动拼起来。这一版之后，更新彻底不依赖 GitHub —— 别人也能正常收到更新。本版需要手动装一次（旧版本不认分片）。",
-    "sizeBytes":  43792860,
+    "version":  "0.10.9-w6",
+    "notes":  "0.10.9-w6：底部导航改成悬空胶囊（选中那格垫一块淡色圆角底）；桌面组件重做——一节课一张白卡、上下课时间竖排、『进行中/下一节』用胶囊标出来，不再是一堆字挤在一起；课表表头的月份挪到左上角那个空位（一周里最小的月份），日期格子高度整齐了。",
+    "sizeBytes":  43809244,
     "parts":  [
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.8-w6-release.apk.part01",
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.8-w6-release.apk.part02",
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.8-w6-release.apk.part03",
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.8-w6-release.apk.part04",
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.8-w6-release.apk.part05",
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.8-w6-release.apk.part06",
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.8-w6-release.apk.part07"
-              ],
-    "apkUrl":  "https://raw.githubusercontent.com/zhyyzxhnwml/WISclass/main/release/ShangKeLe-0.10.8-w6-release.apk"
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.9-w6-release.apk.part01",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.9-w6-release.apk.part02",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.9-w6-release.apk.part03",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.9-w6-release.apk.part04",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.9-w6-release.apk.part05",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.9-w6-release.apk.part06",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.9-w6-release.apk.part07"
+              ]
 }
