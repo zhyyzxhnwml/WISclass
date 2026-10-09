@@ -1,14 +1,14 @@
 {
-    "version":  "0.10.9-w6",
-    "notes":  "0.10.9-w6：底部导航改成悬空胶囊（选中那格垫一块淡色圆角底）；桌面组件重做——一节课一张白卡、上下课时间竖排、『进行中/下一节』用胶囊标出来，不再是一堆字挤在一起；课表表头的月份挪到左上角那个空位（一周里最小的月份），日期格子高度整齐了。",
+    "version":  "0.10.10-w6",
+    "notes":  "0.10.10-w6：修「点了安装没反应」。给系统回安装结果的 PendingIntent 之前用了 FLAG_IMMUTABLE，而系统全靠往它上面后加 extras（结果码 + 它自己的安装确认界面）来交货——不可变会把 extras 丢掉，于是既不报错、确认界面也永远弹不出来。Android 12 起改为显式声明 MUTABLE。另外补上「正在准备安装…」：40 多 MB 复制进系统目录要几秒，之前这几秒界面上什么都没有，看着就像点坏了。",
     "sizeBytes":  43809244,
     "parts":  [
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.9-w6-release.apk.part01",
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.9-w6-release.apk.part02",
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.9-w6-release.apk.part03",
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.9-w6-release.apk.part04",
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.9-w6-release.apk.part05",
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.9-w6-release.apk.part06",
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.9-w6-release.apk.part07"
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.10-w6-release.apk.part01",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.10-w6-release.apk.part02",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.10-w6-release.apk.part03",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.10-w6-release.apk.part04",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.10-w6-release.apk.part05",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.10-w6-release.apk.part06",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.10-w6-release.apk.part07"
               ]
 }
