@@ -1,14 +1,15 @@
 {
-    "version":  "0.10.12-w6",
-    "notes":  "0.10.12-w6：三处。① 上课提醒现在会弹卡片：通知渠道改了新 id 并锁 HIGH —— 渠道的重要性在创建那一刻就定死了，光改代码不生效，必须换 id 重建；同时补上提示音、震动、横幅所需的优先级。② 安装多了兜底：系统没给出安装确认界面、或会话失败时，自动改用「把装包交给系统安装器」这条老路再试一次，不再出现「点了安装没反应」。③ 下载改成 GitHub 整包优先、Gitee 分片兜底 —— 开着代理时快很多（Gitee 分片实测只有 100 KB/s，40 多 MB 要七八分钟），连不上就自动退回分片，不影响没代理的人。",
+    "version":  "0.10.13-w6",
+    "notes":  "0.10.13-w6：① 修「录音变成临时录音」——这门课被删（重新导入课表、清理旧学期）时，note.courseId 的外键是 ON DELETE SET NULL，会把归属抹掉且不可逆，界面只好显示「临时录音」。现在归属显示多了两层兜底：先从标题里取回开录那一刻的课程名，再退回临时录音。② 桌面组件换成浅蓝调：底色、卡片、强调三层都带蓝，没有一处纯白；内边距从 12 放到 16，卡片更高更松，不再挤成一团。③ 转写完成后自动让 AI 抽一遍待办，日程不用你手动点「读一遍」也会自己长出来。",
     "sizeBytes":  43809244,
     "parts":  [
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.12-w6-release.apk.part01",
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.12-w6-release.apk.part02",
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.12-w6-release.apk.part03",
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.12-w6-release.apk.part04",
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.12-w6-release.apk.part05",
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.12-w6-release.apk.part06",
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.12-w6-release.apk.part07"
-              ]
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.13-w6-release.apk.part01",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.13-w6-release.apk.part02",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.13-w6-release.apk.part03",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.13-w6-release.apk.part04",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.13-w6-release.apk.part05",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.13-w6-release.apk.part06",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.13-w6-release.apk.part07"
+              ],
+    "apkUrl":  "https://raw.githubusercontent.com/zhyyzxhnwml/WISclass/apk/ShangKeLe-0.10.13-w6-release.apk"
 }
