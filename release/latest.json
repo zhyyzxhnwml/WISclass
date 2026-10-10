@@ -1,14 +1,14 @@
 {
-    "version":  "0.10.10-w6",
-    "notes":  "0.10.10-w6：修「点了安装没反应」。给系统回安装结果的 PendingIntent 之前用了 FLAG_IMMUTABLE，而系统全靠往它上面后加 extras（结果码 + 它自己的安装确认界面）来交货——不可变会把 extras 丢掉，于是既不报错、确认界面也永远弹不出来。Android 12 起改为显式声明 MUTABLE。另外补上「正在准备安装…」：40 多 MB 复制进系统目录要几秒，之前这几秒界面上什么都没有，看着就像点坏了。",
+    "version":  "0.10.11-w6",
+    "notes":  "0.10.11-w6：底栏改成真的浮在内容上。之前它挂在 Scaffold 的 bottomBar 上，系统一定会给它留一条位置，内容被截断在它上方——所以看着只是一条圆角白带子，不是浮动。现在它和内容同层、对齐到底部，课表/日程/笔记/设置的内容从它底下穿过去、滚动时从胶囊底下划过；四个顶层页面各自在滚动内容末尾垫出它的高度，滚到底时最后一条不会被压住。底色留 4% 透明，更像悬空的一层。",
     "sizeBytes":  43809244,
     "parts":  [
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.10-w6-release.apk.part01",
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.10-w6-release.apk.part02",
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.10-w6-release.apk.part03",
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.10-w6-release.apk.part04",
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.10-w6-release.apk.part05",
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.10-w6-release.apk.part06",
-                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.10-w6-release.apk.part07"
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.11-w6-release.apk.part01",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.11-w6-release.apk.part02",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.11-w6-release.apk.part03",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.11-w6-release.apk.part04",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.11-w6-release.apk.part05",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.11-w6-release.apk.part06",
+                  "https://gitee.com/wis314/wisclass/raw/main/release/ShangKeLe-0.10.11-w6-release.apk.part07"
               ]
 }
